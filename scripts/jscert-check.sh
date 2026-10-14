@@ -13,8 +13,10 @@
 # the gate.
 # Logs are kept in $JSCERT_CHECK_LOGS (default: _build/jscert-check).
 #
-# Usage: scripts/jscert-check.sh [--quick]
+# Usage: [JSCERT_GJS=<binary>] scripts/jscert-check.sh [--quick]
 #   --quick  only run the build and the AWS case study
+#   JSCERT_GJS  binary under _build/install/default/bin to check
+#               (default gillian-js; t_js for the transformers memory)
 
 set -u
 
@@ -25,7 +27,8 @@ QUICK=0
 [[ "${1:-}" == "--quick" ]] && QUICK=1
 
 LOGS=${JSCERT_CHECK_LOGS:-$ROOT/_build/jscert-check}
-GJS=$ROOT/_build/install/default/bin/gillian-js
+# The Gillian-JS binary to check; e.g. JSCERT_GJS=t_js for the transformers memory.
+GJS=$ROOT/_build/install/default/bin/${JSCERT_GJS:-gillian-js}
 FAILED=0
 
 report() { # name status detail
