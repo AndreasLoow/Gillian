@@ -64,26 +64,30 @@ fi
 
 if [[ $QUICK -eq 1 ]]; then exit $FAILED; fi
 
-# 3. AWS bug variants. Each must fail, and must fail for the documented reason.
-bug_variant() { # name expected-regex
+# 3. AWS bug variants. Each must fail, and must fail for the documented reason:
+# decodeEncryptionContext is the only failing spec, and its failure is the
+# expected one.
+bug_variant() { # name expected-failure-message
   local name=$1 expected=$2 dir="$LOGS/bug-$1"
   mkdir -p "$dir"
   cp -r "$AMAZON/bugs/$name/." "$dir/"
-  (cd "$dir" && "$GJS" verify deserialize_factory.js --no-lemma-proof -l normal > out.log 2>&1)
+  (cd "$dir" && "$GJS" verify deserialize_factory.js --no-lemma-proof -l disabled > out.log 2>&1)
   local rc=$?
+  local failing
+  failing=$(sed -n 's/^Verifying one spec of procedure \([A-Za-z_]*\)\.\.\. .* Failure$/\1/p' "$dir/out.log" | sort -u | tr '\n' ' ')
   if [[ $rc -eq 0 ]]; then
     report "aws-bug-$name" FAIL "unexpectedly verified"
-  elif grep -qE "$expected" "$dir/out.log" "$dir/file.log" 2>/dev/null; then
-    report "aws-bug-$name" PASS "fails as documented"
+  elif [[ "$failing" == "decodeEncryptionContext " ]] \
+       && grep -q "^1\. $expected" "$dir/out.log" && ! grep -q "^2\. " "$dir/out.log"; then
+    report "aws-bug-$name" PASS "decodeEncryptionContext: $expected"
   else
-    report "aws-bug-$name" FAIL "fails for another reason, see $dir"
+    report "aws-bug-$name" FAIL "failing: ${failing:-none}; see $dir/out.log"
   fi
 }
-# pp: decodeEncryptionContext ends in an error (prototype poisoning).
-bug_variant pp "Spec decodeEncryptionContext 0 terminated with flag error instead of normal"
-# frozen: the postcondition of decodeEncryptionContext fails because the
-# returned object is still extensible.
-bug_variant frozen "Spec decodeEncryptionContext 0 - post condition not unifiable"
+# pp: the duplicate-key check throws (prototype poisoning).
+bug_variant pp "Terminated with flag error instead of normal"
+# frozen: the returned empty encryption context is still extensible.
+bug_variant frozen "Couldn't satisfy postcondition"
 
 # 4. JaVerT and Cosette, run from a scratch copy of the examples.
 ENV=$LOGS/environment
