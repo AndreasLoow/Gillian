@@ -232,8 +232,12 @@ module SplitObjectBase = struct
 end
 
 (* Patch map pretty-printing for nicer diffs *)
-module PatchedBasePMap (S : MyMonadicSMemory) :
-  OpenPMapType with module Entry = S = struct
+module PatchedBasePMap (S : sig
+  include MyMonadicSMemory
+
+  val get_metadata : t -> Expr.t option
+end) =
+struct
   include OpenPMap (LocationIndex) (S)
 
   let pp ft (h : t) =
@@ -245,6 +249,35 @@ module PatchedBasePMap (S : MyMonadicSMemory) :
       pf ft "@[%a |-> %a@]" Expr.pp loc S.pp fv_pairs
     in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
+
+  (* As in [PatchedALocPMap]: when recovery should unfold around a location,
+     also unfold around the objects whose metadata it is. Otherwise a missing
+     internal property of a metadata object (e.g. its "@class") can only be
+     recovered by unfolding unrelated predicates until one happens to work. *)
+  let get_recovery_tactic s e =
+    let current_recovery = get_recovery_tactic s e in
+    match current_recovery.try_unfold with
+    | Some l ->
+        let alocs =
+          List.filter
+            (function
+              | Expr.ALoc _ | Lit (Loc _) -> true
+              | _ -> false)
+            l
+        in
+        if List.is_empty alocs then current_recovery
+        else
+          let to_add =
+            ExpMap.fold
+              (fun key obj acc ->
+                match S.get_metadata obj with
+                | Some e when List.exists (Expr.equal e) alocs -> key :: acc
+                | _ -> acc)
+              s []
+          in
+          let try_unfold = Some (List.sort_uniq Expr.compare (to_add @ l)) in
+          { current_recovery with try_unfold }
+    | None -> current_recovery
 end
 
 (* Patch map pretty-printing for nicer diffs *)
