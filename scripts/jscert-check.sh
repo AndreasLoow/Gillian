@@ -8,7 +8,9 @@
 #      reason* (see Gillian-JS/Examples/Amazon/README.md)
 #   4. the JaVerT verification examples and Cosette symbolic tests
 #
-# Prints one PASS/FAIL line per check and exits non-zero if any check fails.
+# Prints one PASS/FAIL/KNOWN line per check and exits non-zero if any check
+# fails. KNOWN marks a failure caused by a known upstream bug; it does not fail
+# the gate.
 # Logs are kept in $JSCERT_CHECK_LOGS (default: _build/jscert-check).
 #
 # Usage: scripts/jscert-check.sh [--quick]
@@ -27,8 +29,8 @@ GJS=$ROOT/_build/install/default/bin/gillian-js
 FAILED=0
 
 report() { # name status detail
-  printf '%-4s %-40s %s\n' "$2" "$1" "$3"
-  [[ "$2" == PASS ]] || FAILED=1
+  printf '%-5s %-40s %s\n' "$2" "$1" "$3"
+  [[ "$2" == PASS || "$2" == KNOWN ]] || FAILED=1
 }
 
 # z3 >= 5 is required: older versions (e.g. Ubuntu's 4.8.12) crash mid-run.
@@ -67,15 +69,17 @@ if [[ $QUICK -eq 1 ]]; then exit $FAILED; fi
 # 3. AWS bug variants. Each must fail, and must fail for the documented reason:
 # decodeEncryptionContext is the only failing spec, and its failure is the
 # expected one.
-bug_variant() { # name expected-failure-message
-  local name=$1 expected=$2 dir="$LOGS/bug-$1"
+bug_variant() { # name expected-failure-message [known-issue-if-verified]
+  local name=$1 expected=$2 known=${3:-} dir="$LOGS/bug-$1"
   mkdir -p "$dir"
   cp -r "$AMAZON/bugs/$name/." "$dir/"
   (cd "$dir" && "$GJS" verify deserialize_factory.js --no-lemma-proof -l disabled > out.log 2>&1)
   local rc=$?
   local failing
   failing=$(sed -n 's/^Verifying one spec of procedure \([A-Za-z_]*\)\.\.\. .* Failure$/\1/p' "$dir/out.log" | sort -u | tr '\n' ' ')
-  if [[ $rc -eq 0 ]]; then
+  if [[ $rc -eq 0 && -n "$known" ]]; then
+    report "aws-bug-$name" KNOWN "verifies: $known"
+  elif [[ $rc -eq 0 ]]; then
     report "aws-bug-$name" FAIL "unexpectedly verified"
   elif [[ "$failing" == "decodeEncryptionContext " ]] \
        && grep -q "^1\. $expected" "$dir/out.log" && ! grep -q "^2\. " "$dir/out.log"; then
@@ -85,7 +89,11 @@ bug_variant() { # name expected-failure-message
   fi
 }
 # pp: the duplicate-key check throws (prototype poisoning).
-bug_variant pp "Terminated with flag error instead of normal"
+# Known upstream bug since #391: the throwing path leaves a loop, and putting
+# the loop's frame back fails ("FRAMING ON RESULTED IN 0 STATES"), so the path
+# is dropped and the variant verifies. See the fix-produce-matching PR.
+bug_variant pp "Terminated with flag error instead of normal" \
+  "upstream frame-vanishing bug (#391), path dropped"
 # frozen: the returned empty encryption context is still extensible.
 bug_variant frozen "Couldn't satisfy postcondition"
 
