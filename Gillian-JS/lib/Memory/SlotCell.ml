@@ -4,7 +4,10 @@
     An owned slot either holds a value or is in its default state, which reads
     back as the slot's default (JSCertInterface). The cell does not know which
     slot it is, so the slot's name is the first argument of every action and of
-    the predicate: the map of slots passes it on along with its index. *)
+    the predicate: the map of slots passes it on along with its index.
+
+    The predicate describes a slot holding a value; a slot in its default state
+    is described by the domain of the map of slots instead. *)
 
 open Gillian.Monadic
 open Gil_syntax
@@ -16,7 +19,10 @@ module JSCI = Javert_utils.JSCertInterface
 
 type cell = Default | Val of Expr.t [@@deriving yojson]
 type t = cell option [@@deriving yojson]
-type err_t = MissingState | UnknownSlot of Expr.t [@@deriving show, yojson]
+
+type err_t = MissingState | UnknownSlot of Expr.t | DefaultSlot
+[@@deriving show, yojson]
+
 type action = Lookup | Mutate
 type pred = Slot [@@deriving yojson]
 
@@ -72,11 +78,9 @@ let[@inline] execute_action action s args =
         (action_to_str a) pp s (Fmt.Dump.list Expr.pp) args
 
 let[@inline] consume core_pred s args =
-  let open DR.Syntax in
   match (core_pred, s, args) with
-  | Slot, Some c, [ k ] ->
-      let++ v = read k c in
-      (None, [ v ])
+  | Slot, Some (Val v), [ _ ] -> DR.ok (None, [ v ])
+  | Slot, Some Default, [ _ ] -> DR.error DefaultSlot
   | Slot, None, _ -> DR.error MissingState
   | Slot, _, _ -> failwith "Invalid SlotCell consume"
 
@@ -123,7 +127,7 @@ let get_recovery_tactic _ _ = Recovery_tactic.none
 
 let can_fix = function
   | MissingState -> true
-  | UnknownSlot _ -> false
+  | UnknownSlot _ | DefaultSlot -> false
 
 let get_fixes = function
   | MissingState ->
@@ -133,4 +137,4 @@ let get_fixes = function
             (Slot, [], [ Expr.LVar (Gillian.Utils.Generators.fresh_svar ()) ]);
         ];
       ]
-  | UnknownSlot _ -> []
+  | UnknownSlot _ | DefaultSlot -> []

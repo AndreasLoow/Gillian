@@ -181,8 +181,33 @@ end
 (* An object's slots. A slot outside the domain set is in its default state;
    allocation leaves every slot in it. A slot's cell takes the slot's name as
    its first argument, so actions and predicates on a slot repeat its index. *)
+module SlotsBase = struct
+  include PMap (SlotIndex) (SlotCell)
+
+  let is_not_default ((h, _) : t) idx =
+    match ExpMap.find_opt idx h with
+    | Some (Some SlotCell.Default) -> false
+    | _ -> true
+end
+
+(* As for properties, a slot read in its default state joins the domain set,
+   but is not part of the domain the predicates describe *)
+module PatchDomainsetSlots =
+  Injector
+    (struct
+      include DummyInject (SlotsBase)
+
+      let post_consume p (s, outs) =
+        match (p, outs) with
+        | "domainset", [ Expr.ESet dom ] ->
+            let dom = List.filter (SlotsBase.is_not_default s) dom in
+            Delayed.return (s, [ Expr.ESet dom ])
+        | _ -> Delayed.return (s, outs)
+    end)
+    (SlotsBase)
+
 module Slots = struct
-  include MoveInToOut (PMap (SlotIndex) (SlotCell))
+  include MoveInToOut (PatchDomainsetSlots)
 
   let instantiate = function
     | [] -> ((fst (empty ()), Some (Expr.ESet [])), [])
@@ -191,21 +216,25 @@ module Slots = struct
   let slot_pred = Option.get (pred_from_str "slot")
   let domainset_pred = Option.get (pred_from_str "domainset")
 
-  (* The cells cannot state their own assertions, which need their names *)
+  (* The cells cannot state their own assertions, which need their names. A
+     slot in its default state is described by the domain set alone. *)
   let assertions ((h, d) : t) =
     ExpMap.fold
       (fun k c acc ->
-        let v =
-          match c with
-          | Some (SlotCell.Val v) -> Some v
-          | Some SlotCell.Default -> SlotCell.default_of k
-          | None -> None
-        in
-        match v with
-        | Some v -> (slot_pred, [ k; k ], [ v ]) :: acc
-        | None -> acc)
+        match c with
+        | Some (SlotCell.Val v) -> (slot_pred, [ k; k ], [ v ]) :: acc
+        | _ -> acc)
       h []
-    @ Option.fold ~none:[] ~some:(fun d -> [ (domainset_pred, [ d ], []) ]) d
+    @ Option.fold ~none:[]
+        ~some:(fun d ->
+          let d =
+            match d with
+            | Expr.ESet ks ->
+                Expr.ESet (List.filter (SlotsBase.is_not_default (h, None)) ks)
+            | d -> d
+          in
+          [ (domainset_pred, [ d ], []) ])
+        d
 
   let get_fixes e =
     get_fixes e
