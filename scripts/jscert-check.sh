@@ -61,8 +61,14 @@ start=$SECONDS
 "$GJS" verify deserialize_factory.js --no-lemma-proof -l disabled > "$LOGS/aws.log" 2>&1
 rc=$?
 secs=$((SECONDS - start))
-if [[ $rc -eq 0 ]] && grep -q "All specs succeeded" "$LOGS/aws.log"; then
+# The case study has 8 specs: fewer means some vanished, which would also
+# report success.
+AWS_SPECS=8
+nspecs=$(grep -c "Verifying one spec.*Success" "$LOGS/aws.log")
+if [[ $rc -eq 0 ]] && grep -q "All specs succeeded" "$LOGS/aws.log" && [[ $nspecs -eq $AWS_SPECS ]]; then
   report aws PASS "$(grep -o 'All specs succeeded.*' "$LOGS/aws.log" | head -1) (wall ${secs}s)"
+elif [[ $rc -eq 0 && $nspecs -ne $AWS_SPECS ]]; then
+  report aws FAIL "$nspecs of $AWS_SPECS specs verified, see $LOGS/aws.log"
 else
   report aws FAIL "rc=$rc, see $LOGS/aws.log"
 fi

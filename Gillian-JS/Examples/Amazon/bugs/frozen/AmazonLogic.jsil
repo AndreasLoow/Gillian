@@ -575,6 +575,9 @@ proc AP_map(xsc, vthis, callbackfn) {
   tt:     kval := "get" (arr_obj, pk) with elab;
           scp := slot(callbackfn, "@scope");
           fun := slot(callbackfn, "@call");
+          goto [fun = "default"] callee_code_27 callee_next_27;
+callee_code_27: fun := slot(callbackfn, "@code");
+callee_next_27: skip;
           mapv := fun (scp, t, kval, k, arr_obj) with elab;
           ret_def := "a__defineOwnProperty" (new_arr, pk, {{ "d", mapv, true, true, true }}, false) with elab;
 

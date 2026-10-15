@@ -127,6 +127,9 @@ proc get (l, prop) {
 	get:	skip;
 			xsc := slot(ret, "@scope");				(* Get the scope of the getter          *)
 			fun := slot(ret, "@call");					(* Get the name of the getter           *)
+			goto [fun = "default"] callee_code_15 callee_next_15;
+callee_code_15: fun := slot(ret, "@code");
+callee_next_15: skip;
 			ret := fun (xsc, l) with elab;			(* Call the getter, errors could happen *)
 			goto [ret = empty] undef rlab;
 	undef:	ret := undefined;
@@ -194,6 +197,9 @@ proc put (l, prop, value, thrw) {
     ad:		s := l-nth (ret, 2);
     		xsc := slot(s, "@scope");
     		fun := slot(s, "@call");
+    		goto [fun = "default"] callee_code_16 callee_next_16;
+callee_code_16: fun := slot(s, "@code");
+callee_next_16: skip;
     		ret := fun (xsc, l, value) with elab;
     		goto remp;
 
@@ -272,6 +278,9 @@ proc defaultValue (l, hint) {
     call:  skip;
     	   xsc := slot(ret, "@scope");
            fun := slot(ret, "@call");
+           goto [fun = "default"] callee_code_17 callee_next_17;
+callee_code_17: fun := slot(ret, "@code");
+callee_next_17: skip;
            ret := fun (xsc, l) with elab;
 		   goto [ret = empty] undef ispr;
 	undef: ret := undefined;
@@ -719,6 +728,9 @@ proc i__getValue (v) {
 	get:	skip;
 			xsc := slot(ret, "@scope");	(* Get the scope of the getter *)
 			fun := slot(ret, "@call");	(* Get the name of the getter *)
+			goto [fun = "default"] callee_code_18 callee_next_18;
+callee_code_18: fun := slot(ret, "@code");
+callee_next_18: skip;
 			ret := fun (xsc, rbase) with elab;	(* Call the getter, errors could happen *)
 			goto [ret = empty] undef rlab;
 	undef:	ret := undefined;
@@ -796,6 +808,9 @@ proc i__putValue (v, w) {
 	ad:	    s := l-nth (ret, 2);
             xsc := slot(s, "@scope");
             fun := slot(s, "@call");
+            goto [fun = "default"] callee_code_19 callee_next_19;
+callee_code_19: fun := slot(s, "@code");
+callee_next_19: skip;
             ret := fun (xsc, rbase, w) with elab;
             goto dflt;
 

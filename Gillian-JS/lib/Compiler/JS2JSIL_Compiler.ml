@@ -281,6 +281,28 @@ let make_empty_ass () =
   let empty_ass = LBasic (Assignment (x, Lit Empty)) in
   (x, empty_ass)
 
+(* As in JSCert, a user function's [@call] and [@construct] say "default" and
+   its body is in [@code]: replace [x], read from one of the former, by the
+   body if so.
+     goto [x = "default"] code next;
+     code: x := slot(obj, "@code");
+     next: skip *)
+let resolve_code x obj =
+  let code = fresh_then_label () in
+  let next = fresh_next_label () in
+  [
+    ( None,
+      LGuardedGoto
+        ( BinOp
+            ( PVar x,
+              Equal,
+              Lit (String Javert_utils.JSCertInterface.tag_default) ),
+          code,
+          next ) );
+    (Some code, LBasic (GetSlot (x, obj, Lit (String _codePropName))));
+    (Some next, LBasic Skip);
+  ]
+
 let make_create_function_object_call x_sc fun_id params =
   let x_f = fresh_fun_var () in
   let processed_params = List.map (fun p -> Literal.String p) params in
@@ -1987,76 +2009,82 @@ let rec translate_expr tr_ctx e :
                   ]
               @ if_verification []
                   (annotate_cmds
-                     [
-                       (* PREP *)
-                       (Some get_bt, cmd_get_bt);
-                       (*        x_bt := [xfvm, "@boundTarget"];                                         *)
-                       (None, cmd_bind_test);
-                       (*        goto [x_bt = empty] call bind                                           *)
+                     ([
+                        (* PREP *)
+                        (Some get_bt, cmd_get_bt);
+                        (*        x_bt := [xfvm, "@boundTarget"];                                         *)
+                        (None, cmd_bind_test);
+                        (*        goto [x_bt = empty] call bind                                           *)
 
-                       (* BIND *)
-                       (Some bind, cmd_get_ba);
-                       (*         x_ba := [xfvm, "@boundArgs"];                                         *)
-                       (None, cmd_get_tf);
-                       (*         x_tf := [xfvm, "@targetFunction"];                                    *)
-                       (None, cmd_bass_xreffprototype);
-                       (*         x_bref_fprototype := ref-o(x_tf, "prototype")                         *)
-                       (None, cmd_bgv_xreffprototype);
-                       (*         x_bf_prototype := i__getValue(x_bref_prototype) with err              *)
-                       (None, cmd_bis_object);
-                       (*         goto [typeof (x_bf_prototype) = Obj] else1 then1;                     *)
-                       (Some bthen1, cmd_bset_proto);
-                       (* bthen1: x_bwhyGodwhy := $lobj_proto                                           *)
-                       (Some belse1, cmd_bproto_phi);
-                       (* belse1: x_bprototype := PHI (x_bf_prototype, x_bwhyGodwhy)                  *)
-                       (None, cmd_bcdo_call);
-                       (*         x_bcdo := create_default_object (x_bthis, x_bprototype)               *)
-                       (None, cmd_xtfm);
-                       (*         xtfm := metadata(x_tf)                                                *)
-                       (None, cmd_bbody);
-                       (*         x_bbody := [xtfm, "@construct"];                                      *)
-                       (None, cmd_bscope);
-                       (*         x_fscope := [xtfm, "@scope"]                                          *)
-                       (None, cmd_append);
-                       (*        SOMETHING ABOUT PARAMETERS                                             *)
-                       (None, cmd_bind);
-                       (*        MAGICAL FLATTENING CALL                                                *)
-                       (None, cmd_bgoto_test_type);
-                       (*        goto [typeOf(x_r1) = Obj ] next4 next3;                                *)
-                       (Some bnext3, cmd_bret_this);
-                       (* next3: skip                                                                   *)
-                       (Some bnext4, cmd_bphi_final);
-                       (* next4: x_rcall := PHI(x_r1, x_this)                                           *)
-                       (None, cmd_sync)
-                       (*        goto join                                                              *);
-                     ])
+                        (* BIND *)
+                        (Some bind, cmd_get_ba);
+                        (*         x_ba := [xfvm, "@boundArgs"];                                         *)
+                        (None, cmd_get_tf);
+                        (*         x_tf := [xfvm, "@targetFunction"];                                    *)
+                        (None, cmd_bass_xreffprototype);
+                        (*         x_bref_fprototype := ref-o(x_tf, "prototype")                         *)
+                        (None, cmd_bgv_xreffprototype);
+                        (*         x_bf_prototype := i__getValue(x_bref_prototype) with err              *)
+                        (None, cmd_bis_object);
+                        (*         goto [typeof (x_bf_prototype) = Obj] else1 then1;                     *)
+                        (Some bthen1, cmd_bset_proto);
+                        (* bthen1: x_bwhyGodwhy := $lobj_proto                                           *)
+                        (Some belse1, cmd_bproto_phi);
+                        (* belse1: x_bprototype := PHI (x_bf_prototype, x_bwhyGodwhy)                  *)
+                        (None, cmd_bcdo_call);
+                        (*         x_bcdo := create_default_object (x_bthis, x_bprototype)               *)
+                        (None, cmd_xtfm);
+                        (*         xtfm := metadata(x_tf)                                                *)
+                        (None, cmd_bbody);
+                        (*         x_bbody := [xtfm, "@construct"];                                      *)
+                      ]
+                     @ resolve_code x_bbody (PVar xtfm)
+                     @ [
+                         (None, cmd_bscope);
+                         (*         x_fscope := [xtfm, "@scope"]                                          *)
+                         (None, cmd_append);
+                         (*        SOMETHING ABOUT PARAMETERS                                             *)
+                         (None, cmd_bind);
+                         (*        MAGICAL FLATTENING CALL                                                *)
+                         (None, cmd_bgoto_test_type);
+                         (*        goto [typeOf(x_r1) = Obj ] next4 next3;                                *)
+                         (Some bnext3, cmd_bret_this);
+                         (* next3: skip                                                                   *)
+                         (Some bnext4, cmd_bphi_final);
+                         (* next4: x_rcall := PHI(x_r1, x_this)                                           *)
+                         (None, cmd_sync)
+                         (*        goto join                                                              *);
+                       ]))
               @ annotate_cmds
-                  [
-                    (Some call, cmd_ass_xreffprototype);
-                    (*        x_ref_fprototype := ref-o(x_f_val, "prototype")                        *)
-                    (None, cmd_gv_xreffprototype);
-                    (*        x_f_prototype := i__getValue(x_ref_prototype) with err                 *)
-                    (None, cmd_is_object);
-                    (*        goto [typeof (x_f_prototype) = Obj] else1 then1;                       *)
-                    (Some then1, cmd_set_proto);
-                    (* then1:  x_whyGodwhy := $lobj_proto                                            *)
-                    (Some else1, cmd_proto_phi);
-                    (* else1: x_prototype := PHI (x_f_prototype, x_whyGodwhy)                      *)
-                    (None, cmd_cdo_call);
-                    (*        x_cdo := create_default_object (x_this, x_prototype)                   *)
-                    (None, cmd_body);
-                    (*        x_body := [xfvm, "@construct"]                                         *)
-                    (None, cmd_scope);
-                    (*        x_fscope := [xfvm, "@scope"]                                           *)
-                    (None, cmd_proc_call);
-                    (*        x_r1 := x_body (x_scope, x_this, x_arg0_val, ..., x_argn_val) with err *)
-                    (None, cmd_goto_test_type);
-                    (*        goto [typeOf(x_r1) = Obj ] next4 next3;                                *)
-                    (Some next3, cmd_ret_this);
-                    (* next3: skip                                                                   *)
-                    (Some next4, cmd_phi_final)
-                    (* next4: x_rcall := PHI(x_r1, x_this)                                           *);
-                  ]
+                  ([
+                     (Some call, cmd_ass_xreffprototype);
+                     (*        x_ref_fprototype := ref-o(x_f_val, "prototype")                        *)
+                     (None, cmd_gv_xreffprototype);
+                     (*        x_f_prototype := i__getValue(x_ref_prototype) with err                 *)
+                     (None, cmd_is_object);
+                     (*        goto [typeof (x_f_prototype) = Obj] else1 then1;                       *)
+                     (Some then1, cmd_set_proto);
+                     (* then1:  x_whyGodwhy := $lobj_proto                                            *)
+                     (Some else1, cmd_proto_phi);
+                     (* else1: x_prototype := PHI (x_f_prototype, x_whyGodwhy)                      *)
+                     (None, cmd_cdo_call);
+                     (*        x_cdo := create_default_object (x_this, x_prototype)                   *)
+                     (None, cmd_body);
+                     (*        x_body := [xfvm, "@construct"]                                         *)
+                   ]
+                  @ resolve_code x_body (PVar xfvm)
+                  @ [
+                      (None, cmd_scope);
+                      (*        x_fscope := [xfvm, "@scope"]                                           *)
+                      (None, cmd_proc_call);
+                      (*        x_r1 := x_body (x_scope, x_this, x_arg0_val, ..., x_argn_val) with err *)
+                      (None, cmd_goto_test_type);
+                      (*        goto [typeOf(x_r1) = Obj ] next4 next3;                                *)
+                      (Some next3, cmd_ret_this);
+                      (* next3: skip                                                                   *)
+                      (Some next4, cmd_phi_final)
+                      (* next4: x_rcall := PHI(x_r1, x_this)                                           *);
+                    ])
               @ if_verification []
                   (annotate_cmds
                      [
@@ -2488,35 +2516,39 @@ let rec translate_expr tr_ctx e :
                   ]
               @ if_verification []
                   (annotate_cmds
-                     [
-                       (* PREP *)
-                       (Some get_bt, cmd_get_ibt);
-                       (*        x_bt := [xfvm, "@boundTarget"];                                      *)
-                       (None, cmd_bind_test);
-                       (*        goto [x_bt = empty] call bind                                           *)
+                     ([
+                        (* PREP *)
+                        (Some get_bt, cmd_get_ibt);
+                        (*        x_bt := [xfvm, "@boundTarget"];                                      *)
+                        (None, cmd_bind_test);
+                        (*        goto [x_bt = empty] call bind                                           *)
 
-                       (* BIND *)
-                       (Some bind, cmd_get_bt);
-                       (*        x_bt := [xfvm, "@boundThis"];                                          *)
-                       (None, cmd_get_ba);
-                       (*        x_ba := [xfvm, "@boundArgs"];                                          *)
-                       (None, cmd_get_tf);
-                       (*        x_tf := [xfvm, "@targetFunction"];                                     *)
-                       (None, cmd_xtfm);
-                       (*        xtfm := metadata(x_tf)                                                  *)
-                       (None, cmd_bbody);
-                       (*        x_bbody := [xtfm, "@call"];                                               *)
-                       (None, cmd_bscope);
-                       (*        x_fscope := [xtfm, "@scope"]                                              *)
-                       (None, cmd_append);
-                       (*        SOMETHING ABOUT PARAMETERS                                                *)
-                       (None, cmd_bind);
-                       (*        MAGICAL FLATTENING CALL                                                   *)
-                       (None, cmd_sync)
-                       (*        goto join                                                                 *);
-                     ])
+                        (* BIND *)
+                        (Some bind, cmd_get_bt);
+                        (*        x_bt := [xfvm, "@boundThis"];                                          *)
+                        (None, cmd_get_ba);
+                        (*        x_ba := [xfvm, "@boundArgs"];                                          *)
+                        (None, cmd_get_tf);
+                        (*        x_tf := [xfvm, "@targetFunction"];                                     *)
+                        (None, cmd_xtfm);
+                        (*        xtfm := metadata(x_tf)                                                  *)
+                        (None, cmd_bbody);
+                        (*        x_bbody := [xtfm, "@call"];                                               *)
+                      ]
+                     @ resolve_code x_bbody (PVar xtfm)
+                     @ [
+                         (None, cmd_bscope);
+                         (*        x_fscope := [xtfm, "@scope"]                                              *)
+                         (None, cmd_append);
+                         (*        SOMETHING ABOUT PARAMETERS                                                *)
+                         (None, cmd_bind);
+                         (*        MAGICAL FLATTENING CALL                                                   *)
+                         (None, cmd_sync)
+                         (*        goto join                                                                 *);
+                       ]))
               (* CALL *)
-              @ annotate_cmds [ (Some call, cmd_body) ]
+              @ annotate_cmds
+                  ((Some call, cmd_body) :: resolve_code x_body (PVar xfvm))
               @ if_verification []
                   (annotate_cmds
                      [

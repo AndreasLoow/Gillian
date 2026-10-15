@@ -103,6 +103,9 @@ proc FP_call (xsc, vthis, this_arg) {
   res_a:  PHI(arguments: opt_args, emp_args);
 
           body := slot(func, "@call");
+          goto [body = "default"] callee_code_11 callee_next_11;
+callee_code_11: body := slot(func, "@code");
+callee_next_11: skip;
           xscope := slot(func, "@scope");
           params := l+ ({{ body, xscope, this_arg }}, arguments);
           (* Actual function call *)
@@ -155,6 +158,9 @@ proc FP_apply (xsc, vthis, this_arg, arg_array) {
 
 	call:	xthis := this_arg;
 			body   := slot(vthis, "@call");
+			goto [body = "default"] callee_code_12 callee_next_12;
+callee_code_12: body := slot(vthis, "@code");
+callee_next_12: skip;
 			xscope := slot(vthis, "@scope");
 
 			params := l+ ({{ body, xscope, xthis }}, params);
@@ -227,10 +233,16 @@ proc FP_bind (xsc, vthis, thisArg) {
 
           (* Adapting for our call *)
           field_call := slot(Target, "@call");
+          goto [field_call = "default"] callee_code_13 callee_next_13;
+callee_code_13: field_call := slot(Target, "@code");
+callee_next_13: skip;
           slot(F, "@call") := field_call;
 
           (* Adapting for our construct *)
           field_constr := slot(Target, "@construct");
+          goto [field_constr = "default"] callee_code_14 callee_next_14;
+callee_code_14: field_constr := slot(Target, "@code");
+callee_next_14: skip;
           slot(F, "@construct") := field_constr;
 
           (* Step 15 onward *)

@@ -123,6 +123,15 @@ proc create_function_object (xsc, call, construct, params) {
 
 			slot(ret, "@scope") := xsc;
 
+			(* As in JSCert (13.2): the body is in @code, and @call and @construct are
+			   the default ones *)
+			slot(ret, "@code") := call;
+			slot(ret, "@call") := "default";
+			slot(ret, "@construct") := "default";
+			slot(ret, "@formalParameters") := params;
+			slot(ret, "@get") := "function";
+			slot(ret, "@hasInstance") := "function";
+
 			prototype := "Object_construct" ();
 			[prototype, "constructor"] := {{ "d", ret, true, false, true }};
 			[ret, "prototype"]           := {{ "d", prototype, true, false, false }};

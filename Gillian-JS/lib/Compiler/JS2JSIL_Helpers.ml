@@ -100,6 +100,7 @@ let reserved_biannots =
 let setupHeapName = "setupInitialHeap"
 let _callPropName = "@call"
 let _constructPropName = "@construct"
+let _codePropName = "@code"
 let _scopePropName = "@scope"
 let _classPropName = "@class"
 let _extensiblePropName = "@extensible"

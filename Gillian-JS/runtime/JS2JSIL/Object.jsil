@@ -502,6 +502,9 @@ proc OP_toLocaleString(xsc, vthis) {
 	call:	skip;
 			scp := slot(ret, "@scope");
 			fun := slot(ret, "@call");
+			goto [fun = "default"] callee_code_20 callee_next_20;
+callee_code_20: fun := slot(ret, "@code");
+callee_next_20: skip;
 			ret := fun (scp, vthis) with elab;
 
 	rlab: return;

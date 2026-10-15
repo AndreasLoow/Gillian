@@ -36,10 +36,15 @@ pred JSFunctionObject (l:Obj; fid:Str, sc:List, len:Num, proto:Obj) :
   Slot(l, "@proto", $lfun_proto) *
   Slot(l, "@class", "Function") *
   Slot(l, "@extensible", true) *
-  Slot(l, "@call", fid) *
-  Slot(l, "@construct", fid) *
+  Slot(l, "@call", "default") *
+  Slot(l, "@construct", "default") *
+  Slot(l, "@code", fid) *
+  Slot(l, "@formalParameters", #params) *
+  Slot(l, "@get", "function") *
+  Slot(l, "@hasInstance", "function") *
   Slot(l, "@scope", sc) *
-  slots_domain(l : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
+  slots_domain(l : -{ "@call", "@class", "@code", "@construct", "@extensible", "@formalParameters",
+                      "@get", "@hasInstance", "@proto", "@scope" }-);
 
 pred JSFunctionObjectStrong (l:Obj; fid:Str, sc:List, len:Num, proto:Obj) :
   JSFunctionObject (l, fid, sc, len, proto) *
@@ -50,7 +55,7 @@ pred JSBIFunction (l:Obj; fid:Str, len:Num) :
   Slot(l, "@proto", $lfun_proto) *
   Slot(l, "@class", "Function") *
   Slot(l, "@extensible", true) *
-  Slot(l, "@call", fid) *
+  Slot(l, "@call", fid) * (! (fid == "default")) *
   Slot(l, "@scope", empty) *
   slots_domain(l : -{ "@call", "@class", "@extensible", "@proto", "@scope" }-);
 
@@ -61,8 +66,8 @@ pred BIFunctionObject (l:Obj; len:Num, proto:Obj, call, construct) :
   Slot(l, "@class", "Function") *
   Slot(l, "@extensible", true) *
   Slot(l, "@scope", empty) *
-  Slot(l, "@call", call) *
-  Slot(l, "@construct", construct) *
+  Slot(l, "@call", call) * (! (call == "default")) *
+  Slot(l, "@construct", construct) * (! (construct == "default")) *
   slots_domain(l : -{ "@call", "@class", "@construct", "@extensible", "@proto", "@scope" }-);
 
 (**************************
@@ -519,6 +524,15 @@ proc create_function_object (xsc, call, construct, params) {
         l := "create_object_with_call_construct" (call, construct, len);
 
         slot(l, "@scope") := xsc;
+
+        (* As in JSCert (13.2): the body is in @code, and @call and @construct are
+           the default ones *)
+        slot(l, "@code") := call;
+        slot(l, "@call") := "default";
+        slot(l, "@construct") := "default";
+        slot(l, "@formalParameters") := params;
+        slot(l, "@get") := "function";
+        slot(l, "@hasInstance") := "function";
 
         prototype := "Object_construct" ();
         [prototype, "constructor"] := {{ "d", l, true, false, true }};
@@ -1493,6 +1507,9 @@ proc get (l, prop) {
   get:   skip;
          xsc := slot(ret, "@scope");            (* Get the scope of the getter          *)
          fun := slot(ret, "@call");             (* Get the name of the getter           *)
+         goto [fun = "default"] callee_code_21 callee_next_21;
+callee_code_21: fun := slot(ret, "@code");
+callee_next_21: skip;
          ret := fun (xsc, l) with elab;   (* Call the getter, errors could happen *)
 
   rlab:  return;
@@ -1626,6 +1643,9 @@ proc i__getValue (v) {
 	get:	skip;
 			xsc := slot(ret, "@scope");	(* Get the scope of the getter *)
 			fun := slot(ret, "@call");	(* Get the name of the getter *)
+			goto [fun = "default"] callee_code_22 callee_next_22;
+callee_code_22: fun := slot(ret, "@code");
+callee_next_22: skip;
 			ret := fun (xsc, rbase) with elab;	(* Call the getter, errors could happen *)
 			goto [ret = empty] undef rlab;
 	undef:	ret := undefined;
@@ -2023,6 +2043,9 @@ proc put (l, prop, value, thrw) {
     ad:     s := l-nth (ret, 2);
             xsc := slot(s, "@scope");
             fun := slot(s, "@call");
+            goto [fun = "default"] callee_code_23 callee_next_23;
+callee_code_23: fun := slot(s, "@code");
+callee_next_23: skip;
             ret := fun (xsc, l, value) with elab;
             goto remp;
 
@@ -2085,6 +2108,9 @@ proc i__putValue (v, w) {
 	ad:	    s := l-nth (ret, 2);
             xsc := slot(s, "@scope");
             fun := slot(s, "@call");
+            goto [fun = "default"] callee_code_24 callee_next_24;
+callee_code_24: fun := slot(s, "@code");
+callee_next_24: skip;
             ret := fun (xsc, rbase, w) with elab;
             goto dflt;
 
@@ -2146,6 +2172,9 @@ proc FP_call () {
 
   body:   skip;
           body   := slot(vthis, "@call");
+          goto [body = "default"] callee_code_25 callee_next_25;
+callee_code_25: body := slot(vthis, "@code");
+callee_next_25: skip;
           xscope := slot(vthis, "@scope");
 
           x__se := "SyntaxError" ();

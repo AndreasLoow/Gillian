@@ -66,6 +66,10 @@ let is_slot_name n = List.mem n slot_names
 let slot_default n =
   List.find_map (fun s -> if s.name = n then Some s.default else None) slots
 
+(** The [call] and [construct] tag of a user function, whose body is in [@code]:
+    JSCert's [call_default] and [construct_default]. *)
+let tag_default = "default"
+
 (** {1 Actions and core predicates} *)
 
 let get_slot = "GetSlot"
