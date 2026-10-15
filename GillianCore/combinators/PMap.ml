@@ -662,7 +662,7 @@ struct
   let[@inline] get idx h = ExpMap.sym_find_opt h idx
 
   let[@inline] set ~idx ~idx' s h =
-    if S.is_empty s then ExpMap.remove idx h
+    if S.is_empty s then ExpMap.remove idx h |> ExpMap.remove idx'
     else if Expr.equal idx idx' then ExpMap.add idx s h
     else ExpMap.remove idx h |> ExpMap.add idx' s
 
@@ -728,7 +728,8 @@ struct
 
   let[@inline] set ~idx ~idx' s (ch, sh) =
     (* remove from both (dont know where it was) *)
-    let ch', sh' = (ExpMap.remove idx ch, ExpMap.remove idx sh) in
+    let remove h = ExpMap.remove idx h |> ExpMap.remove idx' in
+    let ch', sh' = (remove ch, remove sh) in
     if S.is_empty s then (ch', sh')
     else if Expr.is_concrete idx' && S.is_concrete s then
       (ExpMap.add idx' s ch', sh')
