@@ -11,125 +11,104 @@ predicate changes on either side.
 
 The two memory models are built from combinators that correspond one to one,
 and they expose the same actions and core predicates. The simulation relates
-the CSE model to JSCert's object heap. Each action is a JSCert core heap
-operation, so the action relation is equality on the encoded arguments and
-results.
-
-Status markers:
-- **now:** what Gillian-JS does today;
-- **target:** what the plan moves it to.
+the CSE model to JSCert's object heap.
 
 ## 1. Combinator stack
 
 | Level | Gillian-JS (OCaml) | CSE (Rocq) | JSCert |
 |---|---|---|---|
-| Heap | `OpenPMap(LocationIndex)` | `map_mm Loc` | `Heap.heap object_loc object` |
-| Object | product with alloc-init (target) | `prod_mm` + `cmm_init` | `object` |
-| Properties | `PMap(StringIndex)` with domain set, over `DynCell` (now) | `js_map_mm DynCell` | `object_properties_` : `Heap.heap prop_name attributes` |
-| Slots | static-domain `PMap(SlotName)` over `Exclusive` (target) | `dom_map_mm SlotName ex_mm` | the other 23 fields of `object` |
+| Heap | `OpenPMap(LocationIndex)` | `map_mm Nat` (`JS_Object.js_heap`) | `Heap.heap object_loc object` |
+| Object | `Product` of properties and slots | `prod_mm` (`js_object`), initialising both sides | `object` |
+| Properties | `PMap(StringIndex)` with domain set, over `DynCell` | `js_map_mm` over `DynCell` (`js_block`) | `object_properties_` |
+| Slots | `PMap(SlotIndex)` with domain set, over `SlotCell` | `js_map_mm` over `SlotCell` (`js_slots`) | the other 23 fields of `object` |
 
-**Now:**
-- an object is `Product(PMap(StringIndex, DynCell), Agreement)`;
-- the attributes and internal fields live in a separate metadata object, which
-  the `Agreement` side points to;
-- `MoveInToOut` makes the domain an in of `Props`, as in the JSIL logic.
+- A property outside the domain is absent; a slot outside the domain is in its
+  default state.
+- Allocation gives an object with every property absent and every slot in its
+  default state, which is JSCert's `object_new null "Object"`.
+
+**`DynCell`** (`GillianCore/combinators/DynCell.ml`, `js_theories/DynCell.v`).
+- Actions `lookup`, `mutate`, `delete`; predicate `dyn`, CSE resource `rm_cell`.
+- An absent cell holds `none` on the Gillian side and is `DC_absent` on the CSE
+  side, which reads back as `VUndef`.
+
+**`SlotCell`** (`Gillian-JS/lib/Memory/SlotCell.ml`, `js_theories/SlotCell.v`).
+- Actions `lookup [k]`, `mutate [k; v]`; predicate `slot [k]; [v]`, CSE resource
+  `rm_slot`. The slot's name `k` is the first argument, since a default state
+  reads back as the default of that slot.
+- The predicate describes a slot holding a value; a slot in its default state
+  is described by the domain alone.
 
 ## 2. Actions
 
-| Action (ins → outs) | JSCert | CSE path | Miss / error |
-|---|---|---|---|
-| `Alloc(proto, class) → l` | `object_alloc S (object_new proto class)` | `map_mm` new → `Object.cmm_init [proto; class]` | never misses |
-| `GetProp(l, p) → attrs \| none` | `Heap.read_option (object_properties_ O) p` | heap → props → `DynCell` `lookup` | miss: `l` or `p` not owned |
-| `SetProp(l, p, attrs)` | `object_set_property` | … → `DynCell` `mutate` | miss: as `GetProp`; error: `attrs` ill-formed |
-| `DelProp(l, p)` | `object_rem_property` | … → `DynCell` `delete` | miss: as `GetProp` |
-| `GetKeys(l) → [p…]` | the domain of `object_properties_` (as a list, up to permutation) | `JS_Map` keys action (new) | miss: the domain or a cell not owned |
-| `GetSlot(l, f) → v` | the field `f` of the object at `l` | heap → slots → `ex_mm` `lookup` | miss: slot not owned; error: unknown `f` |
-| `SetSlot(l, f, v)` | `object_write` with field `f` updated | … → `ex_mm` `mutate` | as `GetSlot`; error: `v` ill-typed for `f` |
+| Action (ins → outs) | Path | JSCert |
+|---|---|---|
+| `Alloc(l?) → l` | heap alloc → object init | `object_alloc S (object_new null "Object")` |
+| `GetCell(l, p) → attrs \| none` | heap → properties → `DynCell lookup` | `Heap.read_option (object_properties_ O) p` |
+| `SetCell(l, p, attrs)` | … → `DynCell mutate` | `object_set_property` |
+| `DeleteCell(l, p)` | … → `DynCell delete` | `object_rem_property` |
+| `GetAllProps(l) → [p…]` | properties domain | the domain of `object_properties_` (planned: a keys action on the CSE side) |
+| `GetSlot(l, f, f) → v` | heap → slots → `SlotCell lookup [f]` | the field `f` of the object at `l` |
+| `SetSlot(l, f, f, v)` | … → `SlotCell mutate [f; v]` | `object_write` with field `f` updated |
 
-- JSCert has no object deletion. Gillian's `DeleteObject` is kept only for the
-  compiler's cleanup, and is outside the simulation.
-- Misses are Gillian's `can_fix` errors, and CSE's `miss` outcomes. Errors are
-  the remaining ones, CSE's `err`.
+- In JSIL, `x := slot(l, f)` and `slot(l, f) := v` compile to `GetSlot` and
+  `SetSlot`, repeating `f`.
+- `DeleteObject` is only used for clean-up, and is outside the simulation.
 
 ## 3. Core predicates
 
 | Predicate | Meaning | CSE resource |
 |---|---|---|
-| `Prop(l, p; attrs)` (now `Cell`) | the property `p` of `l`; `none` means owned and absent | `DynCell` `rm_cell` |
-| `Props(l, D)` | every property of `l` outside `D` is owned and absent | `JS_Map` domain (`pointsto_undef_vs_dom`) |
-| `Slot(l, f; v)` | the slot `f` of `l` | `ex_mm` cell |
+| `Cell(l, p; attrs)` | the property `p` of `l`; `none` means owned and absent | `DynCell.rm_cell` |
+| `Props(l, D)` | every property of `l` outside `D` is owned and absent | properties domain |
+| `Slot(l, f, f; v)` | the slot `f` of `l` holds `v` | `SlotCell.rm_slot` |
+| `SlotsDomain(l, D)` | every slot of `l` outside `D` is owned and default | slots domain |
 
-- `Props` takes the domain as an in on both sides.
-- `DataProp`, `AccessorProp`, `JSObject`, `JSObjGeneral` and so on become
-  logic-level predicates over these, keeping their names.
-
-**`DynCell`.** Gillian's `DynCell` (`GillianCore/combinators/DynCell.ml`) has
-the actions `lookup`, `mutate` and `delete` and the single predicate `dyn`,
-like CSE's `act_lookup`, `act_mutate`, `act_delete` and `rm_cell`.
-- An absent cell holds `none` on the Gillian side, and is `DC_absent` on the
-  CSE side, which reads back as `VUndef`.
-- Writing `none` is an error on the Gillian side; CSE's `mutate` errors on any
-  value outside the cell's type.
-- CSE also has the resources `rm_val` and `rm_absent`, one per state. `rm_cell`
-  is their union for cells that never hold `VUndef`.
+In JSIL logic these are `((l, p) -> attrs)`, `empty_fields(l : D)`,
+`Slot(l, f, v)` and `slots_domain(l : D)`.
 
 ## 4. Attributes
-
-A property's attributes are one value, so one cell holds the whole JSCert
-`attributes` record.
 
 | JSCert | Gillian-JS | CSE |
 |---|---|---|
 | `attributes_data_of {value; writable; enumerable; configurable}` | `{{ "d", v, w, e, c }}` | `VList [VString "d"; v; VBool w; VBool e; VBool c]` |
 | `attributes_accessor_of {get; set; enumerable; configurable}` | `{{ "a", g, s, e, c }}` | `VList [VString "a"; g; s; VBool e; VBool c]` |
-| no property | `none` | `VUndef` (the `DynCell` absent state) |
+| no property | `none` | `VUndef` |
 
 ## 5. Slots
 
-The slot names are the JSCert field names. `Alloc(proto, class)` gives every
-slot the default from `object_new proto class`. An option field's `None` is
-encoded as `empty` (see §6).
+See `Gillian-JS/lib/utils/JSCertInterface.ml` for the table. `@proto` and
+`@class` default to `null` and `"Object"`, as in `object_new null "Object"`;
+an option field defaults to `empty`.
 
-| JSCert field | Gillian slot (now → target) | Values | `object_new` default |
-|---|---|---|---|
-| `object_proto_` | `@proto` | `null` or a location | `proto` |
-| `object_class_` | `@class` | string | `class` |
-| `object_extensible_` | `@extensible` | bool | `true` |
-| `object_prim_value_` | `@primitiveValue` | `empty` or a value | `empty` |
-| `object_get_` | `@get` (new) | `"default"`, `"function"`, `"args_obj"` | `"default"` |
-| `object_get_own_prop_` | `@getOwnProperty` (new) | `"default"`, `"args_obj"`, `"string"` | `"default"` |
-| `object_get_prop_` | `@getProperty` (new) | `"default"` | `"default"` |
-| `object_put_` | `@put` (new) | `"default"` | `"default"` |
-| `object_can_put_` | `@canPut` (new) | `"default"` | `"default"` |
-| `object_has_prop_` | `@hasProperty` (new) | `"default"` | `"default"` |
-| `object_delete_` | `@delete` (new) | `"default"`, `"args_obj"` | `"default"` |
-| `object_default_value_` | `@defaultValue` (new) | `"default"` | `"default"` |
-| `object_define_own_prop_` | `@defineOwnProperty` (new) | `"default"`, `"array"`, `"args_obj"` | `"default"` |
-| `object_construct_` | `@construct` | `empty`, `"default"`, `"after_bind"` or a prealloc name | `empty` |
-| `object_call_` | `@call` | `empty`, `"default"`, `"after_bind"` or a prealloc name | `empty` |
-| `object_has_instance_` | `@hasInstance` | `empty`, `"function"`, `"after_bind"` | `empty` |
-| `object_scope_` | `@scope` | see D3 | `empty` |
-| `object_formal_parameters_` | `@formalParameters` | `empty` or a list of strings | `empty` |
-| `object_code_` | `@code` (new) | `empty` or a function id; see D3 | `empty` |
-| `object_target_function_` | `@targetFunction` | `empty` or a location | `empty` |
-| `object_bound_this_` | `@boundThis` | `empty` or a value | `empty` |
-| `object_bound_args_` | `@boundArguments` | `empty` or a list of values | `empty` |
-| `object_parameter_map_` | `@parameterMap` (new) | `empty` or a location | `empty` |
+| JSCert field | Gillian slot | Default |
+|---|---|---|
+| `object_proto_` | `@proto` | `null` |
+| `object_class_` | `@class` | `"Object"` |
+| `object_extensible_` | `@extensible` | `true` |
+| `object_prim_value_` | `@primitiveValue` | `empty` |
+| `object_get_` … `object_define_own_prop_` (9 tags) | `@get`, `@getOwnProperty`, `@getProperty`, `@put`, `@canPut`, `@hasProperty`, `@delete`, `@defaultValue`, `@defineOwnProperty` | `"default"` |
+| `object_construct_`, `object_call_`, `object_has_instance_` | `@construct`, `@call`, `@hasInstance` | `empty` |
+| `object_scope_`, `object_formal_parameters_`, `object_code_` | `@scope`, `@formalParameters`, `@code` | `empty` |
+| `object_target_function_`, `object_bound_this_`, `object_bound_args_`, `object_parameter_map_` | `@targetFunction`, `@boundThis`, `@boundArguments`, `@parameterMap` | `empty` |
 
-**`@call` and `@construct` today hold a JSIL procedure id.** In the target they
-hold JSCert's tag, and a user function's procedure id moves to `@code`. The
-runtime then dispatches on the tag.
+Gillian-only slots, outside the simulated fragment (they must be default
+there):
+- `@ArrayBufferData`, `@ArrayBufferByteLength`, `@ViewedArrayBuffer`,
+  `@ByteOffset`, `@ByteLength`, `@ArrayLength` (ArrayBuffer, DataView,
+  Uint8Array);
+- `@er`, which marks environment records (decision 2: they are still
+  objects).
 
-**Gillian-only slots.** Gillian-JS's `ArrayBuffer`, `DataView` and `Uint8Array`
-keep internal fields that JSCert does not have:
-- `@ArrayBufferData` and `@ArrayBufferByteLength`;
-- `@ViewedArrayBuffer`, `@ByteOffset`, `@ByteLength` and `@ArrayLength`.
-
-They are slots on both sides too. The simulation relates only states in which
-they are all `empty`, so the AWS case study, which uses them, is verified but
-lies outside the simulated fragment.
+**Still to align with JSCert (A7):**
+- `@call` and `@construct` hold a JSIL procedure id; JSCert holds a tag
+  (`call_default`, …), with a user function's code in `object_code_`.
+- The runtime does not set the method tags (`@get = "function"` for function
+  objects, `"args_obj"` for arguments objects, …).
 
 ## 6. Values
+
+`js_theories/JS_Values.v`.
 
 | JSCert | Gillian-JS | CSE |
 |---|---|---|
@@ -137,21 +116,15 @@ lies outside the simulated fragment.
 | `prim_null` | `null` | `VNull` |
 | `prim_bool b` | `b` | `VBool b` |
 | `prim_string s` | `s` | `VString s` |
-| `prim_number n` | `n` (float) | **D4** |
-| `object_loc_normal n` | a fresh location | `VNat n` |
-| `object_loc_prealloc p` | a named location (`$lg`, `$lobj_proto`, …) | **D4** |
-| option `None` | `empty` | **D4** |
+| `prim_number n` | `n` | `VNum n`: the ADT value `JSNum (bits_of_b64 n)` |
+| an object location | a location | `VNat (object_loc_to_nat l)`: ordinary locations odd, built-in ones even |
+| option `None` | `empty` | `VEmpty`: the ADT value `JSEmpty` |
+
+The ADT constructors are a parameter (`JS_ADTs`), since CSE's ADT environment
+`Aenv` is a global parameter (D4).
 
 ## 7. Open decisions
 
-- **D3: `code` and `scope`.**
-  - `code`: a function id is related to a JSCert `funcbody` through a fixed code
-    table, a parameter of the JSCert wrapper.
-  - `scope`: while environment records remain `@er` objects, `scope` is outside
-    the related fragment.
-- **D4: CSE values for numbers, preallocated locations and `None`.** Either:
-  - add constructors to CSE's core value type; or
-  - encode them with existing constructors. For example:
-    - `pVADT "JSNum" "num" [pVInt bits]` for a number;
-    - `pVADT "JSLoc" name []` for a preallocated location;
-    - `pVADT "JS" "empty" []` for `None`.
+- **D3: `code` and `scope`.** `code` relates a function id to a JSCert
+  `funcbody` through a fixed code table. `scope` stays outside the related
+  fragment while environment records remain objects.
