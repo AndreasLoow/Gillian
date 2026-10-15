@@ -66,6 +66,13 @@ module MoveInToOut (S : Gillian.Combinators.MyMonadicSMemory.S) :
             else Delayed.vanish ()
         | _ -> Delayed_result.ok (s', outs))
     | _ -> consume pred s ins
+
+  (* Likewise, the domain is an in of the assertions and the signature. *)
+  let move_domainset (p, ins, outs) =
+    if pred_to_str p = "domainset" then (p, ins @ outs, []) else (p, ins, outs)
+
+  let assertions s = List.map move_domainset (S.assertions s)
+  let list_preds () = List.map move_domainset (S.list_preds ())
 end
 
 (* Outer substitutions for JS *)
