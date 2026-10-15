@@ -7,7 +7,8 @@
 #   3. the two AWS bug variants, each of which must fail *for its documented
 #      reason* (see Gillian-JS/Examples/Amazon/README.md)
 #   4. the JaVerT verification examples and Cosette symbolic tests
-#   5. concrete execution of the examples in Gillian-JS/Examples/Concrete
+#   5. concrete execution of the examples in Gillian-JS/Examples/Concrete, and
+#      the type check on slot writes
 #
 # Prints one PASS/FAIL/KNOWN line per check and exits non-zero if any check
 # fails. KNOWN marks a failure caused by a known upstream bug; it does not fail
@@ -144,6 +145,19 @@ for f in Examples/Concrete/*.js; do
     report "concrete/$name" PASS ""
   else
     report "concrete/$name" FAIL "rc=$rc, see $log"
+  fi
+done
+
+# Writing a slot checks the type of the value, concretely and symbolically.
+for mode in exec wpst; do
+  "$GJS" $mode Examples/Concrete/slot_typed.jsil --jsil -l disabled > "$LOGS/slot-typed-$mode.log" 2>&1
+  ok=$?
+  "$GJS" $mode Examples/Concrete/slot_ill_typed.jsil --jsil -l disabled > "$LOGS/slot-ill-typed-$mode.log" 2>&1
+  bad=$?
+  if [[ $ok -eq 0 && $bad -ne 0 ]]; then
+    report "slot-types/$mode" PASS ""
+  else
+    report "slot-types/$mode" FAIL "well typed rc=$ok, ill typed rc=$bad"
   fi
 done
 

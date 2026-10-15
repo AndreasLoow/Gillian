@@ -50,8 +50,11 @@ Gillian side, where a `PMap` entry is a single `DynCell`.
   it, or consuming its `ex`, brings it into the map and its name into the
   domain set.
 - A key that is not a literal is resolved by branching over the slot names.
-- The CSE side rejects a write of a value outside the slot's type. The
-  Gillian side does not check types yet (A7).
+- A write of a value outside the slot's type errs on both sides. The Gillian
+  side (`SetSlot` is `TypedStore`, `JSCertInterface.slot_types`) checks the
+  GIL type of the value, e.g. a string for a method tag; the CSE side checks
+  the field's codec, which is finer, e.g. one of the tags JSCert has. The
+  Gillian-only slots take any value.
 
 **Concrete memory** (`Concrete` in `Gillian-JS/lib/Memory/JSILMemory.ml`,
 `GillianCore/combinators/CCombinators.ml`).
@@ -151,7 +154,6 @@ there):
 
 **Still to align with JSCert:**
 - `@scope` holds a list of environment-record objects (decision 2).
-- The Gillian side does not type-check `SetSlot`.
 
 ## 6. Values
 

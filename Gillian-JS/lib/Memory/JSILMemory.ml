@@ -86,7 +86,7 @@ module JSSubst : NameMap = struct
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
       ("GetSlot", "right_load");
-      ("SetSlot", "right_store");
+      ("SetSlot", "right_typed_store");
     ]
 
   let pred_substitutions =
@@ -224,10 +224,64 @@ module Slots = struct
     | _ -> execute_action a s args
 end
 
+(* Writing a slot checks the type of the value, since JSCert's fields are
+   typed. *)
+module TypedStore (S : sig
+  include MyMonadicSMemory
+
+  val store : action
+end) : ActionAddition with type t = S.t = struct
+  type t = S.t
+  type action = TypedStore
+
+  type err_t = StoreErr of S.err_t | SlotType of Expr.t * Expr.t
+  [@@deriving show, yojson]
+
+  let list_actions () = [ (TypedStore, [ "index"; "value" ], []) ]
+  let action_from_str s = if s = JSCI.typed_store then Some TypedStore else None
+  let action_to_str TypedStore = JSCI.typed_store
+
+  let[@inline] execute_action TypedStore s args =
+    let open Delayed.Syntax in
+    let store args =
+      Delayed.map (S.execute_action S.store s args) (function
+        | Ok x -> Ok x
+        | Error e -> Error (StoreErr e))
+    in
+    match args with
+    | [ idx; v ] -> (
+        let* idx_opt = SlotIndex.is_valid_index idx in
+        match idx_opt with
+        | Some (Expr.Lit (String n) as idx') -> (
+            match JSCI.slot_types n with
+            | None -> store [ idx'; v ]
+            | Some tys ->
+                let tys =
+                  Expr.ESet (List.map (fun t -> Expr.Lit (Type t)) tys)
+                in
+                if%sat Expr.BinOp (Expr.UnOp (TypeOf, v), SetMem, tys) then
+                  store [ idx'; v ]
+                else Delayed_result.error (SlotType (idx', v)))
+        | _ -> store args)
+    | _ -> store args
+
+  let can_fix _ = false
+  let get_fixes _ = []
+  let get_recovery_tactic _ _ = Gillian.General.Recovery_tactic.none
+end
+
+module SlotsStore = struct
+  include Slots
+
+  let store = Option.get (action_from_str "store")
+end
+
+module TypedSlots = ActionAdder (TypedStore (SlotsStore)) (Slots)
+
 (* The content of memory at a given location: properties * slots *)
 module BaseMemoryContent (S : MyMonadicSMemory) = struct
   module S =
-    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (Slots)
+    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (TypedSlots)
 
   include ActionAdder (DeleteActionAddition (S)) (S)
 end
@@ -426,7 +480,21 @@ module Concrete = struct
           | _ -> None
       end)
 
-  module Object = C.Product (IDs) (PropsWithKeys) (Slots)
+  module TypedSlots = struct
+    include Slots
+
+    let execute_action a s args =
+      match (a, args) with
+      | "typed_store", [ (Literal.String n as k); v ] -> (
+          match JSCI.slot_types n with
+          | Some tys when not (List.mem (Literal.type_of v) tys) ->
+              C.err "slot mutate err: type" [ k; v ]
+          | _ -> Slots.execute_action "store" s args)
+      | "typed_store", _ -> Slots.execute_action "store" s args
+      | _ -> Slots.execute_action a s args
+  end
+
+  module Object = C.Product (IDs) (PropsWithKeys) (TypedSlots)
 
   module Names : NameMap = struct
     let action_substitutions =
@@ -438,7 +506,7 @@ module Concrete = struct
         ("Alloc", "alloc");
         ("DeleteObject", "free");
         ("GetSlot", "right_load");
-        ("SetSlot", "right_store");
+        ("SetSlot", "right_typed_store");
       ]
 
     let pred_substitutions = []

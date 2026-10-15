@@ -35,9 +35,20 @@ let procedures_installed () =
         (Option.to_list b.call @ Option.to_list b.construct))
     JSCI.builtins
 
+(* A slot's default must be a value it may hold. *)
+let defaults_typed () =
+  List.iter
+    (fun (sl : JSCI.slot) ->
+      match sl.types with
+      | Some tys when not (List.mem (Gil_syntax.Literal.type_of sl.default) tys)
+        -> Alcotest.failf "%s: default of the wrong type" sl.name
+      | _ -> ())
+    JSCI.slots
+
 let () =
   Alcotest.run "jscert_interface"
     [
+      ("slots", [ Alcotest.test_case "defaults typed" `Quick defaults_typed ]);
       ( "builtins",
         [
           Alcotest.test_case "82 preallocs" `Quick (fun () ->

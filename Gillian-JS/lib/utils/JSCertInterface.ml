@@ -15,9 +15,12 @@ type slot = {
   default : Literal.t;
       (** The value [Alloc] gives the slot, as [object_new] does in JSCert. An
           option field's [None] is [empty]. *)
+  types : Type.t list option;
+      (** The types of the values the slot may hold, those of its JSCert field,
+          if it has one. Writing a value of another type is an error. *)
 }
 
-let slot ?jscert name default = { name; jscert; default }
+let slot ?jscert ?types name default = { name; jscert; default; types }
 
 (* The fields of [object_new proto class] other than [proto] and [class],
    which [Alloc] does not take yet: until it does, they start as [null] and
@@ -25,30 +28,49 @@ let slot ?jscert name default = { name; jscert; default }
 let slots : slot list =
   let none = Literal.Empty in
   let default = Literal.String "default" in
+  let prim =
+    Type.[ UndefinedType; NullType; BooleanType; NumberType; StringType ]
+  in
+  let value = Type.ObjectType :: prim in
+  let tag = Type.[ StringType ] in
+  let opt tys = Some (Type.EmptyType :: tys) in
   [
-    slot "@proto" ~jscert:"object_proto_" Null;
-    slot "@class" ~jscert:"object_class_" (String "Object");
-    slot "@extensible" ~jscert:"object_extensible_" (Bool true);
-    slot "@primitiveValue" ~jscert:"object_prim_value_" none;
-    slot "@get" ~jscert:"object_get_" default;
-    slot "@getOwnProperty" ~jscert:"object_get_own_prop_" default;
-    slot "@getProperty" ~jscert:"object_get_prop_" default;
-    slot "@put" ~jscert:"object_put_" default;
-    slot "@canPut" ~jscert:"object_can_put_" default;
-    slot "@hasProperty" ~jscert:"object_has_prop_" default;
-    slot "@delete" ~jscert:"object_delete_" default;
-    slot "@defaultValue" ~jscert:"object_default_value_" default;
-    slot "@defineOwnProperty" ~jscert:"object_define_own_prop_" default;
-    slot "@construct" ~jscert:"object_construct_" none;
-    slot "@call" ~jscert:"object_call_" none;
-    slot "@hasInstance" ~jscert:"object_has_instance_" none;
-    slot "@scope" ~jscert:"object_scope_" none;
-    slot "@formalParameters" ~jscert:"object_formal_parameters_" none;
-    slot "@code" ~jscert:"object_code_" none;
-    slot "@targetFunction" ~jscert:"object_target_function_" none;
-    slot "@boundThis" ~jscert:"object_bound_this_" none;
-    slot "@boundArguments" ~jscert:"object_bound_args_" none;
-    slot "@parameterMap" ~jscert:"object_parameter_map_" none;
+    slot "@proto" ~jscert:"object_proto_"
+      ~types:Type.[ NullType; ObjectType ]
+      Null;
+    slot "@class" ~jscert:"object_class_" ~types:tag (String "Object");
+    slot "@extensible" ~jscert:"object_extensible_"
+      ~types:Type.[ BooleanType ]
+      (Bool true);
+    slot "@primitiveValue" ~jscert:"object_prim_value_" ?types:(opt prim) none;
+    slot "@get" ~jscert:"object_get_" ~types:tag default;
+    slot "@getOwnProperty" ~jscert:"object_get_own_prop_" ~types:tag default;
+    slot "@getProperty" ~jscert:"object_get_prop_" ~types:tag default;
+    slot "@put" ~jscert:"object_put_" ~types:tag default;
+    slot "@canPut" ~jscert:"object_can_put_" ~types:tag default;
+    slot "@hasProperty" ~jscert:"object_has_prop_" ~types:tag default;
+    slot "@delete" ~jscert:"object_delete_" ~types:tag default;
+    slot "@defaultValue" ~jscert:"object_default_value_" ~types:tag default;
+    slot "@defineOwnProperty" ~jscert:"object_define_own_prop_" ~types:tag
+      default;
+    slot "@construct" ~jscert:"object_construct_" ?types:(opt tag) none;
+    slot "@call" ~jscert:"object_call_" ?types:(opt tag) none;
+    slot "@hasInstance" ~jscert:"object_has_instance_" ?types:(opt tag) none;
+    slot "@scope" ~jscert:"object_scope_" ?types:(opt Type.[ ListType ]) none;
+    slot "@formalParameters" ~jscert:"object_formal_parameters_"
+      ?types:(opt Type.[ ListType ])
+      none;
+    slot "@code" ~jscert:"object_code_" ?types:(opt tag) none;
+    slot "@targetFunction" ~jscert:"object_target_function_"
+      ?types:(opt Type.[ ObjectType ])
+      none;
+    slot "@boundThis" ~jscert:"object_bound_this_" ?types:(opt value) none;
+    slot "@boundArguments" ~jscert:"object_bound_args_"
+      ?types:(opt Type.[ ListType ])
+      none;
+    slot "@parameterMap" ~jscert:"object_parameter_map_"
+      ?types:(opt Type.[ ObjectType ])
+      none;
     (* Gillian-only: ArrayBuffer, DataView and Uint8Array *)
     slot "@ArrayBufferData" none;
     slot "@ArrayBufferByteLength" none;
@@ -57,7 +79,7 @@ let slots : slot list =
     slot "@ByteLength" none;
     slot "@ArrayLength" none;
     (* Gillian-only: marks environment records, which are objects *)
-    slot "@er" (Bool false);
+    slot "@er" ~types:Type.[ BooleanType ] (Bool false);
   ]
 
 let slot_names = List.map (fun s -> s.name) slots
@@ -65,6 +87,14 @@ let is_slot_name n = List.mem n slot_names
 
 let slot_default n =
   List.find_map (fun s -> if s.name = n then Some s.default else None) slots
+
+(** The types slot [n] may hold, if restricted *)
+let slot_types n =
+  Option.join
+    (List.find_map (fun s -> if s.name = n then Some s.types else None) slots)
+
+(** [SetSlot] checks the type of the value it writes. *)
+let typed_store = "typed_store"
 
 (** The [call] and [construct] tag of a user function, whose body is in [@code]:
     JSCert's [call_default] and [construct_default]. *)

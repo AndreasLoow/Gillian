@@ -1,0 +1,6 @@
+proc main () {
+      x := new();
+      slot(x, "@extensible") := false;
+      ret := undefined;
+      return
+};
