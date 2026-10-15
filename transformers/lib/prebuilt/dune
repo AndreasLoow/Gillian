@@ -8,6 +8,7 @@
   gillian.ppx_sat.runtime
   gillian-js.js2jsil_lib
   gillian-js.semantics
+  gillian-js.memory
   gillian-c.cgil_lib
   wisl.parserAndCompiler
   ppx_deriving_yojson.runtime)

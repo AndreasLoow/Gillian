@@ -16,7 +16,7 @@
 # Usage: [JSCERT_GJS=<binary>] scripts/jscert-check.sh [--quick]
 #   --quick  only run the build and the AWS case study
 #   JSCERT_GJS  binary under _build/install/default/bin to check
-#               (default gillian-js; t_js for the transformers memory)
+#               (default gillian-js)
 
 set -u
 
@@ -27,7 +27,7 @@ QUICK=0
 [[ "${1:-}" == "--quick" ]] && QUICK=1
 
 LOGS=${JSCERT_CHECK_LOGS:-$ROOT/_build/jscert-check}
-# The Gillian-JS binary to check; e.g. JSCERT_GJS=t_js for the transformers memory.
+# The Gillian-JS binary to check.
 GJS=$ROOT/_build/install/default/bin/${JSCERT_GJS:-gillian-js}
 FAILED=0
 

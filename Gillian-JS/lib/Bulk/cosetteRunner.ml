@@ -2,7 +2,7 @@ open Gillian
 
 module Outcome =
   Bulk.Outcome.Make_Symbolic
-    (Semantics.Symbolic)
+    (Js_memory.JSILMemory.Symbolic)
     (Js2jsil_lib.JS2GIL_ParserAndCompiler)
     (General.External.Dummy (Gil_syntax.Annot.Basic))
 
