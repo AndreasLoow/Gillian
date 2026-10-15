@@ -177,7 +177,7 @@ of the related fragment, as decided, rather than a mismatch within it.
 The ADT constructors are a parameter (`JS_ADTs`), since CSE's ADT environment
 `Aenv` is a global parameter (D4).
 
-## 7. Open decisions
+## 7. Decisions
 
 - **D3: `code` and `scope`** (decided). `code` relates a function id to a
   JSCert `funcbody` through a fixed code table (`JS_Slots.Code_Table`).
