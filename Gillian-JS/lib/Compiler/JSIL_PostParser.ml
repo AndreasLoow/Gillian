@@ -95,6 +95,8 @@ let asrts_js_val (x_val : Expr.t) : Asrt.t list =
   in
   [ asrt_empty; asrt_none; asrt_list ]
 
+(* A global variable is a non-configurable property of the global object, as
+   the compiler declares it and as [scope] describes it. *)
 let var_assertion (fid : string) (x : string) (x_val : Expr.t) : Asrt.t =
   let asrt_val : Asrt.t =
     if fid <> !Config.entry_point then
@@ -109,7 +111,7 @@ let var_assertion (fid : string) (x : string) (x_val : Expr.t) : Asrt.t =
               x_val;
               Lit (Bool true);
               Lit (Bool true);
-              Lit (Bool true);
+              Lit (Bool false);
             ] )
   in
   asrt_val
