@@ -573,9 +573,8 @@ proc AP_map(xsc, vthis, callbackfn) {
           goto [kpres] tt ff;
 
   tt:     kval := "get" (arr_obj, pk) with elab;
-          m := metadata(callbackfn);
-          scp := [m, "@scope"];
-          fun := [m, "@call"];
+          scp := slot(callbackfn, "@scope");
+          fun := slot(callbackfn, "@call");
           mapv := fun (scp, t, kval, k, arr_obj) with elab;
           ret_def := "a__defineOwnProperty" (new_arr, pk, {{ "d", mapv, true, true, true }}, false) with elab;
 

@@ -11,18 +11,16 @@ nounfold pred Uint8Array (ar:Obj; buffer:Obj, byteOffset:Num, arrayLength:Num) :
   ((ar, "byteLength") -> none) *
   ((ar, "byteOffset") -> none) *
   ((ar, "slice")      -> none) *
-
-  MetaData(ar, #md) * MetaData(#md, null) *
-  ((#md, "@proto")             -> $lui8ar_proto) * (* Prototype is the Data View prototype          *)
-  ((#md, "@class")             -> "Uint8Array") *  (* Class is "Uint8Array" (doesn't exist in ES6+) *)
-  ((#md, "@extensible")        -> true) *          (* Uint8Arrays are extensible                    *)
-  ((#md, "@ArrayLength")       -> arrayLength) *   (* Length of the array                           *)
-  ((#md, "@ViewedArrayBuffer") -> buffer) *        (* Viewed array buffer                           *)
-  ((#md, "@ByteOffset")        -> byteOffset) *    (* Offset inside the array buffer                *)
-  ((#md, "@ByteLength")        -> arrayLength) *   (* Length of the underlying buffer               *)
+  Slot(ar, "@proto", $lui8ar_proto) * (* Prototype is the Data View prototype          *)
+  Slot(ar, "@class", "Uint8Array") *  (* Class is "Uint8Array" (doesn't exist in ES6+) *)
+  Slot(ar, "@extensible", true) *          (* Uint8Arrays are extensible                    *)
+  Slot(ar, "@ArrayLength", arrayLength) *   (* Length of the array                           *)
+  Slot(ar, "@ViewedArrayBuffer", buffer) *        (* Viewed array buffer                           *)
+  Slot(ar, "@ByteOffset", byteOffset) *    (* Offset inside the array buffer                *)
+  Slot(ar, "@ByteLength", arrayLength) *   (* Length of the underlying buffer               *)
 
   (* No other internal properties *)
-  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ArrayLength", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
+  slots_domain(ar : -{ "@class", "@extensible", "@proto", "@ArrayLength", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
 
   (* Well-formedness *)
   (0 <=# byteOffset) * (0 <=# arrayLength);

@@ -102,9 +102,8 @@ proc FP_call (xsc, vthis, this_arg) {
   blank:  emp_args := {{ }};
   res_a:  PHI(arguments: opt_args, emp_args);
 
-          m := metadata(func);
-          body := [m, "@call"];
-          xscope := [m, "@scope"];
+          body := slot(func, "@call");
+          xscope := slot(func, "@scope");
           params := l+ ({{ body, xscope, this_arg }}, arguments);
           (* Actual function call *)
           ret_val := apply (params) with elab;
@@ -155,9 +154,8 @@ proc FP_apply (xsc, vthis, this_arg, arg_array) {
 			goto loop;
 
 	call:	xthis := this_arg;
-			m := metadata(vthis);
-			body   := [m, "@call"];
-			xscope := [m, "@scope"];
+			body   := slot(vthis, "@call");
+			xscope := slot(vthis, "@scope");
 
 			params := l+ ({{ body, xscope, xthis }}, params);
 
@@ -177,8 +175,8 @@ proc FP_apply (xsc, vthis, this_arg, arg_array) {
 
 proc FP_toString (xsc, vthis) {
 			goto [typeOf (vthis) = Obj] ofun thrw;
-	ofun:	m := metadata(vthis);
-			ret := [m, "@class"];
+	ofun:	skip;
+			ret := slot(vthis, "@class");
 			goto [ret = "Function"] retfun thrw;
 	retfun:	ret := "function () {}";
 
@@ -192,11 +190,9 @@ proc FP_toString (xsc, vthis) {
 
 proc FP_hasInstanceAfterBind (v1, v2) {
 
-			m := metadata(v1);
-			target := [m, "@targetFunction"];
+			target := slot(v1, "@targetFunction");
 
-			m := metadata(target);
-			tclass := [m, "@class"];
+			tclass := slot(target, "@class");
 			goto [tclass = "Function"] cont thrw;
 
 	cont:	ret := "hasInstance" (target, v2);
@@ -225,22 +221,20 @@ proc FP_bind (xsc, vthis, thisArg) {
           F := ret;
 
           (* Set up properties *)
-          m := metadata(F);
-          [m, "@targetFunction"] := Target;
-          [m, "@boundThis"] := thisArg;
-          [m, "@boundArguments"] := A;
+          slot(F, "@targetFunction") := Target;
+          slot(F, "@boundThis") := thisArg;
+          slot(F, "@boundArguments") := A;
 
           (* Adapting for our call *)
-          mt := metadata(Target);
-          field_call := [mt, "@call"];
-          [m, "@call"] := field_call;
+          field_call := slot(Target, "@call");
+          slot(F, "@call") := field_call;
 
           (* Adapting for our construct *)
-          field_constr := [mt, "@construct"];
-          [m, "@construct"] := field_constr;
+          field_constr := slot(Target, "@construct");
+          slot(F, "@construct") := field_constr;
 
           (* Step 15 onward *)
-          targetClass := [mt, "@class"];
+          targetClass := slot(Target, "@class");
           goto [targetClass = "Function"] fun nofun;
 
   fun:    ret := "get" (Target, "length") with elab;

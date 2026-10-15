@@ -17,17 +17,15 @@ nounfold pred DataView (dv:Obj; buffer:Obj, byteOffset:Num, byteLength:Num) :
   ((dv, "setUint8") -> none) *
   ((dv, "setUint16") -> none) *
   ((dv, "setUint32") -> none) *
-
-  MetaData(dv, #md) * MetaData(#md, null) *
-  ((#md, "@proto")             -> $ldv_proto) * (* Prototype is the Data View prototype        *)
-  ((#md, "@class")             -> "DataView") * (* Class is "DataView" (doesn't exist in ES6+) *)
-  ((#md, "@extensible")        -> true) *       (* Data Views are extensible                   *)
-  ((#md, "@ViewedArrayBuffer") -> buffer) *     (* Viewed array buffer                         *)
-  ((#md, "@ByteOffset")        -> byteOffset) * (* Offset inside the array buffer              *)
-  ((#md, "@ByteLength")        -> byteLength) * (* Length of the view                          *)
+  Slot(dv, "@proto", $ldv_proto) * (* Prototype is the Data View prototype        *)
+  Slot(dv, "@class", "DataView") * (* Class is "DataView" (doesn't exist in ES6+) *)
+  Slot(dv, "@extensible", true) *       (* Data Views are extensible                   *)
+  Slot(dv, "@ViewedArrayBuffer", buffer) *     (* Viewed array buffer                         *)
+  Slot(dv, "@ByteOffset", byteOffset) * (* Offset inside the array buffer              *)
+  Slot(dv, "@ByteLength", byteLength) * (* Length of the view                          *)
 
   (* No other internal properties *)
-  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
+  slots_domain(dv : -{ "@class", "@extensible", "@proto", "@ViewedArrayBuffer", "@ByteOffset", "@ByteLength" }-) *
 
   (* Well-formedness *)
   (0 <=# byteOffset) * (0 <=# byteLength);

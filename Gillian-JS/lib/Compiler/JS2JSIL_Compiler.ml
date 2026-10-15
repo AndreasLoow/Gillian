@@ -1728,38 +1728,43 @@ let rec translate_expr tr_ctx e :
 
       (* xfvm := metadata (x_f_val) *)
       let xfvm = fresh_var () in
-      let cmd_xfvm = LBasic (MetaData (xfvm, PVar x_f_val)) in
+      let cmd_xfvm = LBasic (Assignment (xfvm, PVar x_f_val)) in
 
       (* x_hp := [xfvm, "@construct"]; *)
       let x_hp = fresh_var () in
       let cmd_hf_construct =
-        LBasic (HasField (x_hp, PVar xfvm, Lit (String _constructPropName)))
+        LBasic (GetSlot (x_hp, PVar xfvm, Lit (String _constructPropName)))
       in
 
       (* goto [ x_hp = empty ] err next2; *)
       let call = fresh_then_label () in
       let get_bt = fresh_then_label () in
       let jump = if_verification call get_bt in
-      let cmd_goto_xhp = LGuardedGoto (PVar x_hp, jump, tr_ctx.tr_err_lab) in
+      let cmd_goto_xhp =
+        LGuardedGoto
+          ( UnOp (Not, BinOp (PVar x_hp, Equal, Lit Empty)),
+            jump,
+            tr_ctx.tr_err_lab )
+      in
 
       let x_bt = fresh_var () in
       let cmd_get_bt =
-        LBasic (HasField (x_bt, PVar xfvm, Lit (String "@boundThis")))
+        LBasic (GetSlot (x_bt, PVar xfvm, Lit (String "@boundThis")))
       in
 
       let bind = fresh_else_label () in
-      let goto_guard_expr = PVar x_bt in
+      let goto_guard_expr = UnOp (Not, BinOp (PVar x_bt, Equal, Lit Empty)) in
       let cmd_bind_test = LGuardedGoto (goto_guard_expr, bind, call) in
 
       (* BIND *)
       let x_ba = fresh_var () in
       let cmd_get_ba =
-        LBasic (Lookup (x_ba, PVar xfvm, Lit (String "@boundArguments")))
+        LBasic (GetSlot (x_ba, PVar xfvm, Lit (String "@boundArguments")))
       in
 
       let x_tf = fresh_var () in
       let cmd_get_tf =
-        LBasic (Lookup (x_tf, PVar xfvm, Lit (String "@targetFunction")))
+        LBasic (GetSlot (x_tf, PVar xfvm, Lit (String "@targetFunction")))
       in
 
       (* x_bref_fprototype := ref-o(x_tf, "prototype");  *)
@@ -1813,16 +1818,16 @@ let rec translate_expr tr_ctx e :
 
       (* xtfm := metadata (x_tf) *)
       let xtfm = fresh_var () in
-      let cmd_xtfm = LBasic (MetaData (xtfm, PVar x_tf)) in
+      let cmd_xtfm = LBasic (Assignment (xtfm, PVar x_tf)) in
 
       let x_bbody = fresh_body_var () in
       let cmd_bbody =
-        LBasic (Lookup (x_bbody, PVar xtfm, Lit (String _constructPropName)))
+        LBasic (GetSlot (x_bbody, PVar xtfm, Lit (String _constructPropName)))
       in
 
       let x_bfscope = fresh_fscope_var () in
       let cmd_bscope =
-        LBasic (Lookup (x_bfscope, PVar xtfm, Lit (String _scopePropName)))
+        LBasic (GetSlot (x_bfscope, PVar xtfm, Lit (String _scopePropName)))
       in
 
       let x_params = fresh_var () in
@@ -1920,13 +1925,13 @@ let rec translate_expr tr_ctx e :
       (* x_body := [xfvm, "@construct"];  *)
       let x_body = fresh_body_var () in
       let cmd_body =
-        LBasic (Lookup (x_body, PVar xfvm, Lit (String _constructPropName)))
+        LBasic (GetSlot (x_body, PVar xfvm, Lit (String _constructPropName)))
       in
 
       (* x_fscope := [xfvm, "@scope"]; *)
       let x_fscope = fresh_fscope_var () in
       let cmd_scope =
-        LBasic (Lookup (x_fscope, PVar xfvm, Lit (String _scopePropName)))
+        LBasic (GetSlot (x_fscope, PVar xfvm, Lit (String _scopePropName)))
       in
 
       (* x_r1 := x_body (x_scope, x_this, x_arg0_val, ..., x_argn_val) with err  *)
@@ -2308,45 +2313,45 @@ let rec translate_expr tr_ctx e :
       in
 
       let xfvm = fresh_var () in
-      let cmd_xfvm = LBasic (MetaData (xfvm, PVar x_f_val)) in
+      let cmd_xfvm = LBasic (Assignment (xfvm, PVar x_f_val)) in
 
       let x_ibt = fresh_var () in
       let cmd_get_ibt =
-        LBasic (HasField (x_ibt, PVar xfvm, Lit (String "@boundThis")))
+        LBasic (GetSlot (x_ibt, PVar xfvm, Lit (String "@boundThis")))
       in
 
       let bind = fresh_else_label () in
-      let goto_guard_expr = PVar x_ibt in
+      let goto_guard_expr = UnOp (Not, BinOp (PVar x_ibt, Equal, Lit Empty)) in
       let cmd_bind_test = LGuardedGoto (goto_guard_expr, bind, call) in
 
       (* BIND *)
       let x_bt = fresh_var () in
       let cmd_get_bt =
-        LBasic (Lookup (x_bt, PVar xfvm, Lit (String "@boundThis")))
+        LBasic (GetSlot (x_bt, PVar xfvm, Lit (String "@boundThis")))
       in
 
       let x_ba = fresh_var () in
       let cmd_get_ba =
-        LBasic (Lookup (x_ba, PVar xfvm, Lit (String "@boundArguments")))
+        LBasic (GetSlot (x_ba, PVar xfvm, Lit (String "@boundArguments")))
       in
 
       let x_tf = fresh_var () in
       let cmd_get_tf =
-        LBasic (Lookup (x_tf, PVar xfvm, Lit (String "@targetFunction")))
+        LBasic (GetSlot (x_tf, PVar xfvm, Lit (String "@targetFunction")))
       in
 
       (* xtfm := metadata (x_tf) *)
       let xtfm = fresh_var () in
-      let cmd_xtfm = LBasic (MetaData (xtfm, PVar x_tf)) in
+      let cmd_xtfm = LBasic (Assignment (xtfm, PVar x_tf)) in
 
       let x_bbody = fresh_body_var () in
       let cmd_bbody =
-        LBasic (Lookup (x_bbody, PVar xtfm, Lit (String _callPropName)))
+        LBasic (GetSlot (x_bbody, PVar xtfm, Lit (String _callPropName)))
       in
 
       let x_bfscope = fresh_fscope_var () in
       let cmd_bscope =
-        LBasic (Lookup (x_bfscope, PVar xtfm, Lit (String _scopePropName)))
+        LBasic (GetSlot (x_bfscope, PVar xtfm, Lit (String _scopePropName)))
       in
 
       let x_params = fresh_var () in
@@ -2373,7 +2378,7 @@ let rec translate_expr tr_ctx e :
       (* x_body := [x_f_val, "@call"]; *)
       let x_body = fresh_body_var () in
       let cmd_body =
-        LBasic (Lookup (x_body, PVar xfvm, Lit (String _callPropName)))
+        LBasic (GetSlot (x_body, PVar xfvm, Lit (String _callPropName)))
       in
 
       (* EVAL *)
@@ -2398,7 +2403,7 @@ let rec translate_expr tr_ctx e :
       (* x_fscope := [x_f_val, "@scope"]; *)
       let x_fscope = fresh_fscope_var () in
       let cmd_scope =
-        LBasic (Lookup (x_fscope, PVar xfvm, Lit (String _scopePropName)))
+        LBasic (GetSlot (x_fscope, PVar xfvm, Lit (String _scopePropName)))
       in
 
       (* join: goto [ typeOf(x_f) = ObjReference ] then else;  *)
@@ -3375,12 +3380,12 @@ let rec translate_expr tr_ctx e :
 
       (* get the metadata *)
       let x2vm = fresh_var () in
-      let cmd_x2vm = LBasic (MetaData (x2vm, PVar x2_v)) in
+      let cmd_x2vm = LBasic (Assignment (x2vm, PVar x2_v)) in
 
       (* next1: x_cond := hasField (x2_v, "@hasInstance")  *)
       let x_cond = fresh_var () in
       let cmd_hasfield =
-        LBasic (Lookup (x_cond, PVar x2vm, Lit (String "@class")))
+        LBasic (GetSlot (x_cond, PVar x2vm, Lit (String "@class")))
       in
 
       (* goto [ x_cond = empty ] err next2 *)
@@ -3995,23 +4000,16 @@ let rec translate_expr tr_ctx e :
       in
 
       (* x_f_outer_er := new ();  *)
-      let x_f_outer_er_meta = fresh_var () in
       let x_f_outer_er = fresh_er_var () in
 
-      let cmd_ass_xfouter_meta =
-        LBasic (New (x_f_outer_er_meta, None, Some (Lit Null)))
-      in
-      let cmd_ass_xfouter =
-        LBasic (New (x_f_outer_er, None, Some (PVar x_f_outer_er_meta)))
-      in
+      let cmd_ass_xfouter_meta = LBasic Skip in
+      let cmd_ass_xfouter = LBasic (New (x_f_outer_er, None, None)) in
 
       (* [x_er, "@er"] := true *)
       let cmd_er_flag =
         LBasic
-          (Mutation
-             ( PVar x_f_outer_er_meta,
-               Lit (String _erFlagPropName),
-               Lit (Bool true) ))
+          (SetSlot
+             (PVar x_f_outer_er, Lit (String _erFlagPropName), Lit (Bool true)))
       in
 
       (* x_sc_f := x_sc @ {{ x_f_outer_er }}  *)
@@ -4458,16 +4456,15 @@ and translate_statement tr_ctx e =
     let cmd_ass_xerr = LPhiAssignment [ (x_err, phi_args1) ] in
 
     (* x_f_outer_er := new ();  *)
-    let x_er_meta = fresh_var () in
     let x_er = fresh_er_var () in
 
-    let cmd_ass_xer_meta = LBasic (New (x_er_meta, None, Some (Lit Null))) in
-    let cmd_ass_xer = LBasic (New (x_er, None, Some (PVar x_er_meta))) in
+    let cmd_ass_xer_meta = LBasic Skip in
+    let cmd_ass_xer = LBasic (New (x_er, None, None)) in
 
     (* [x_er, "@er"] := true *)
     let cmd_er_flag =
       LBasic
-        (Mutation (PVar x_er_meta, Lit (String _erFlagPropName), Lit (Bool true)))
+        (SetSlot (PVar x_er, Lit (String _erFlagPropName), Lit (Bool true)))
     in
 
     (* x_cae := i__checkAssignmentErrors (ref-v(x_er, "x")) with err2 *)
@@ -4670,16 +4667,15 @@ and translate_statement tr_ctx e =
     let cmd_ass_xerr = LPhiAssignment [ (x_err, phi_args1) ] in
 
     (* x_f_outer_er := new ();  *)
-    let x_er_meta = fresh_var () in
     let x_er = fresh_er_var () in
 
-    let cmd_ass_xer_meta = LBasic (New (x_er_meta, None, Some (Lit Null))) in
-    let cmd_ass_xer = LBasic (New (x_er, None, Some (PVar x_er_meta))) in
+    let cmd_ass_xer_meta = LBasic Skip in
+    let cmd_ass_xer = LBasic (New (x_er, None, None)) in
 
     (* [x_er, "@er"] := true *)
     let cmd_er_flag =
       LBasic
-        (Mutation (PVar x_er_meta, Lit (String _erFlagPropName), Lit (Bool true)))
+        (SetSlot (PVar x_er, Lit (String _erFlagPropName), Lit (Bool true)))
     in
 
     (* x_cae := i__checkAssignmentErrors (ref-v(x_er, "x")) with err2 *)
@@ -6848,19 +6844,14 @@ let generate_proc_eval new_fid ?use_cc e strictness vis_fid : EProc.t =
   (* x_er_m := new (null)   *)
   (* x_er   := new (x_er_m) *)
   let x_er = JS2JSIL_Helpers.var_er in
-  let x_erm = JS2JSIL_Helpers.var_er_metadata in
-  let cmd_er_m_creation =
-    annotate_cmd (LBasic (New (x_erm, None, Some (Lit Null)))) None
-  in
-  let cmd_er_creation =
-    annotate_cmd (LBasic (New (x_er, None, Some (PVar x_erm)))) None
-  in
+  let cmd_er_m_creation = annotate_cmd (LBasic Skip) None in
+  let cmd_er_creation = annotate_cmd (LBasic (New (x_er, None, None))) None in
 
   (* [x_er, "@er"] := true *)
   let cmd_er_flag =
     annotate_cmd
       (LBasic
-         (Mutation (PVar x_erm, Lit (String _erFlagPropName), Lit (Bool true))))
+         (SetSlot (PVar x_er, Lit (String _erFlagPropName), Lit (Bool true))))
       None
   in
 
@@ -7000,19 +6991,14 @@ let generate_proc ?use_cc e fid params strictness vis_fid spec : EProc.t =
 
   (* x_er_m := new (null)   *)
   (* x_er   := new (x_er_m) *)
-  let cmd_er_m_creation =
-    annotate_cmd (LBasic (New (var_er_metadata, None, Some (Lit Null)))) None
-  in
-  let cmd_er_creation =
-    annotate_cmd (LBasic (New (var_er, None, Some (PVar var_er_metadata)))) None
-  in
+  let cmd_er_m_creation = annotate_cmd (LBasic Skip) None in
+  let cmd_er_creation = annotate_cmd (LBasic (New (var_er, None, None))) None in
 
   (* [x_er, "@er"] := true *)
   let cmd_er_flag =
     annotate_cmd
       (LBasic
-         (Mutation
-            (PVar var_er_metadata, Lit (String _erFlagPropName), Lit (Bool true))))
+         (SetSlot (PVar var_er, Lit (String _erFlagPropName), Lit (Bool true))))
       None
   in
 

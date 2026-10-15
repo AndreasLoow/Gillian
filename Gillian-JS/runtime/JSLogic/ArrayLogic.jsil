@@ -9,24 +9,20 @@
 pred ArrayStructure(a:Obj, arrayLength:Num) :
   ((a, "push") -> none) *                            (* Push must be found in the prototype *)
   ((a, "map")  -> none) *
-
-  MetaData(a, #md) * MetaData(#md, null) *
-  ((#md, "@proto")                 -> $larr_proto) * (* Prototype is the array prototype    *)
-  ((#md, "@class")                 -> "Array") *     (* Class is "Array"                    *)
-  ((#md, "@extensible")            -> true) *        (* Array buffers are extensible        *)
-  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-) *
+  Slot(a, "@proto", $larr_proto) * (* Prototype is the array prototype    *)
+  Slot(a, "@class", "Array") *     (* Class is "Array"                    *)
+  Slot(a, "@extensible", true) *        (* Array buffers are extensible        *)
+  slots_domain(a : -{ "@class", "@extensible", "@proto" }-) *
 
   ((a, "length") -> {{ "d", arrayLength, true, false, false }});
 
 pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
   ((a, "push") -> none) *                            (* Push must be found in the prototype *)
   ((a, "map")  -> none) *
-
-  MetaData(a, #md) * MetaData(#md, null) *
-  ((#md, "@proto")                 -> $larr_proto) * (* Prototype is the array prototype    *)
-  ((#md, "@class")                 -> "Array") *     (* Class is "Array"                    *)
-  ((#md, "@extensible")            -> false) *       (* Frozen arrays are not extensible    *)
-  empty_fields (#md : -{ "@class", "@extensible", "@proto" }-) *
+  Slot(a, "@proto", $larr_proto) * (* Prototype is the array prototype    *)
+  Slot(a, "@class", "Array") *     (* Class is "Array"                    *)
+  Slot(a, "@extensible", false) *       (* Frozen arrays are not extensible    *)
+  slots_domain(a : -{ "@class", "@extensible", "@proto" }-) *
 
   ((a, "length") -> {{ "d", arrayLength, false, false, false }});
 

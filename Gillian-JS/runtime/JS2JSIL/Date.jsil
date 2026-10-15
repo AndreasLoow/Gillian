@@ -135,8 +135,8 @@ proc Date_construct (xsc, vthis) {
 			goto [argc = 0] arg0 test1;
 
 			(* No arguments, rtrn now *)
-	arg0:	m := metadata(date);
-			[m, "@primitiveValue"] := $$UTCTime;
+	arg0:	skip;
+			slot(date, "@primitiveValue") := $$UTCTime;
 			goto rlab;
 
 
@@ -151,8 +151,7 @@ proc Date_construct (xsc, vthis) {
 
 	tonum:  ret := "i__toNumber" (ret) with elab;
 			ret := "d__TimeClip" (ret);
-			m := metadata(date);
-			[m, "@primitiveValue"] := ret;
+			slot(date, "@primitiveValue") := ret;
 			goto rlab;
 
 	nimpl:	ret := magic;
@@ -214,8 +213,7 @@ proc Date_construct (xsc, vthis) {
 			utc := "d__UTC" (fd);
 			res := "d__TimeClip" (utc);
 
-			m := metadata(date);
-			[m, "@primitiveValue"] := res;
+			slot(date, "@primitiveValue") := res;
 
 	rlab:	ret := date;
 				return;
@@ -228,11 +226,11 @@ proc Date_construct (xsc, vthis) {
 proc DP_valueOf (xsc, vthis) {
 
 			goto [typeOf vthis = Obj] class tt;
-	class:	m := metadata(vthis);
-			class := [m, "@class"];
+	class:	skip;
+			class := slot(vthis, "@class");
 			goto [class = "Date"] rlab tt;
 
-	rlab:	ret := [m, "@primitiveValue"];
+	rlab:	ret := slot(vthis, "@primitiveValue");
 				return;
 
 	tt:		ret := "TypeError" ();
@@ -246,11 +244,11 @@ proc DP_valueOf (xsc, vthis) {
 proc DP_getTime (xsc, vthis) {
 
 			goto [typeOf vthis = Obj] class tt;
-	class:	m := metadata(vthis);
-			class := [m, "@class"];
+	class:	skip;
+			class := slot(vthis, "@class");
 			goto [class = "Date"] rlab tt;
 
-	rlab:	ret := [m, "@primitiveValue"];
+	rlab:	ret := slot(vthis, "@primitiveValue");
 				return;
 
 	tt:		ret := "TypeError" ();
@@ -263,8 +261,8 @@ proc DP_getTime (xsc, vthis) {
 proc DP_getTimezoneOffset (xsc, vthis) {
 
 			goto [typeOf vthis = Obj] class tt;
-	class:	m := metadata(vthis);
-			class := [m, "@class"];
+	class:	skip;
+			class := slot(vthis, "@class");
 			goto [class = "Date"] rlab tt;
 
 	rlab:	ret := m_round (($$UTCTime - $$LocalTime) / 60000);

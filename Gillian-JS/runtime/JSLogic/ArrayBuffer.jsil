@@ -8,17 +8,15 @@
 
 nounfold pred ArrayBuffer (ab:Obj; data:List) :
   ((ab, "slice") -> none) *                            (* Slice must be found in the prototype           *)
-
-  MetaData(ab, #md) * MetaData(#md, null) *
-  ((#md, "@proto")                 -> $lab_proto) *    (* Prototype is the array buffer prototype        *)
-  ((#md, "@class")                 -> "ArrayBuffer") * (* Class is "ArrayBuffer" (doesn't exist in ES6+) *)
-  ((#md, "@extensible")            -> true) *          (* Array buffers are extensible                   *)
-  ((#md, "@ArrayBufferData")       -> data) *          (* Array buffer contents                          *)
-  ((#md, "@ArrayBufferByteLength") -> #len_data) *     (* Array buffer length                            *)
+  Slot(ab, "@proto", $lab_proto) *    (* Prototype is the array buffer prototype        *)
+  Slot(ab, "@class", "ArrayBuffer") * (* Class is "ArrayBuffer" (doesn't exist in ES6+) *)
+  Slot(ab, "@extensible", true) *          (* Array buffers are extensible                   *)
+  Slot(ab, "@ArrayBufferData", data) *          (* Array buffer contents                          *)
+  Slot(ab, "@ArrayBufferByteLength", #len_data) *     (* Array buffer length                            *)
   ((as_int #len_data) == l-len data) *
 
   (* No other internal properties *)
-  empty_fields (#md : -{ "@class", "@extensible", "@proto", "@ArrayBufferData", "@ArrayBufferByteLength" }-);
+  slots_domain(ab : -{ "@class", "@extensible", "@proto", "@ArrayBufferData", "@ArrayBufferByteLength" }-);
 
 (*********************************
  **** Array Buffer Prototype  ****

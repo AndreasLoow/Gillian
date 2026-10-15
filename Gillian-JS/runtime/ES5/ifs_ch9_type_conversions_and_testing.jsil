@@ -548,8 +548,8 @@ proc i__isCallable (v) {
         goto [typeOf v = Obj] testObject rlab;
 
     testObject:  
-        m := metadata(v);
-        ret := hasField(m, "@call");
+        ret := slot(v, "@call");
+        ret := not (ret = empty);
 
     rlab: 
         return

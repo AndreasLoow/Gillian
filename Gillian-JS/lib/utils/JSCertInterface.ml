@@ -56,6 +56,8 @@ let slots : slot list =
     slot "@ByteOffset" none;
     slot "@ByteLength" none;
     slot "@ArrayLength" none;
+    (* Gillian-only: marks environment records, which are objects *)
+    slot "@er" (Bool false);
   ]
 
 let slot_names = List.map (fun s -> s.name) slots

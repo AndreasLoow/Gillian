@@ -365,10 +365,7 @@ let create_post_scope_pred
       in_params
   in
 
-  (* MetaData (er, _lvar_md_er) *)
   let arg_er : Expr.t = PVar JS2JSIL_Helpers.var_er in
-  let lv_er_md : Expr.t = LVar (Javert_utils.Js_generators.fresh_lvar ()) in
-  let mtdt_er_a : Asrt.t = MetaData (arg_er, lv_er_md) in
   (* empty_fields(er : -{ "arguments", in_params }-) *)
   let args_strs : Expr.t list =
     List.map (fun x -> Expr.Lit (String x)) in_params
@@ -376,21 +373,12 @@ let create_post_scope_pred
   let ef_er_a : Asrt.t = EmptyFields (arg_er, ESet args_strs) in
   (* ((er, "arguments") -> arguments) *)
   (* let args_a    : Asrt.t      = PointsTo (arg_er, Lit (String "arguments"), PVar "arguments") in *)
-  (* MetaData (_lvar_md_er, null) *)
-  let md_md_a : Asrt.t = MetaData (lv_er_md, Lit Null) in
-  (* empty_fields(_lvar_md_er : -{ "@er" }-) *)
-  let ef_md_a : Asrt.t =
-    EmptyFields (lv_er_md, ESet [ Lit (String JS2JSIL_Helpers._erFlagPropName) ])
-  in
-  (* ((lv_er_md, "@er") -> true) *)
-  let er_fl_a : Asrt.t =
-    PointsTo
-      (lv_er_md, Lit (String JS2JSIL_Helpers._erFlagPropName), Lit (Bool true))
-  in
+  (* Slot(er, "@er", true) * slots_domain(er : -{ "@er" }-) *)
+  let er_flag = Expr.Lit (String JS2JSIL_Helpers._erFlagPropName) in
+  let er_fl_a : Asrt.t = Slot (arg_er, er_flag, Lit (Bool true)) in
+  let sd_er_a : Asrt.t = SlotsDomain (arg_er, ESet [ er_flag ]) in
   (* all together *)
-  let er_asrts =
-    [ mtdt_er_a; ef_er_a; (* args_a; *) md_md_a; ef_md_a; er_fl_a ]
-  in
+  let er_asrts = [ ef_er_a; (* args_a; *) er_fl_a; sd_er_a ] in
 
   let pre_scope_args =
     Expr.PVar JS2JSIL_Helpers.var_scope

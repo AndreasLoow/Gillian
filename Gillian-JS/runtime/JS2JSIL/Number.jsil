@@ -34,8 +34,7 @@ proc Number_construct (xsc, vthis, v) {
 
 			ret := "create_default_object" ($lnum_proto, "Number", true);
 
-			m := metadata(ret);
-			[m, "@primitiveValue"] := pv;
+			slot(ret, "@primitiveValue") := pv;
 
 	rlab: return;
 	elab: throw
@@ -49,10 +48,10 @@ proc NP_valueOf (xsc, vthis) {
 			goto rlab;
 
 	ionum:	goto [typeOf (vthis) = Obj] onum thrw;
-	onum:	m := metadata(vthis);
-			ret := [m, "@class"];
+	onum:	skip;
+			ret := slot(vthis, "@class");
 			goto [ret = "Number"] retnum thrw;
-	retnum:	ret := [m, "@primitiveValue"];
+	retnum:	ret := slot(vthis, "@primitiveValue");
 
 	rlab: return;
 
@@ -68,10 +67,10 @@ proc NP_toString (xsc, vthis, radix) {
 			goto retstr;
 
 	ionum:	goto [typeOf (vthis) = Obj] onum thrw;
-	onum:	m := metadata(vthis);
-			ret := [m, "@class"];
+	onum:	skip;
+			ret := slot(vthis, "@class");
 			goto [ret = "Number"] retnum thrw;
-	retnum:	ret := [m, "@primitiveValue"];
+	retnum:	ret := slot(vthis, "@primitiveValue");
 	retstr:	ret := num_to_string (ret);
 
 	rlab: return;

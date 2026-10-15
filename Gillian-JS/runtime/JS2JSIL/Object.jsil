@@ -18,11 +18,10 @@ import Internals.jsil;
 proc i__getFields (l) {
 			  ret := getFields (l);
 
-			  m := metadata(l);
-			  class := [m, "@class"];
+			  class := slot(l, "@class");
 			  goto [class = "String"] add rlab;
 
-	add:	str := [m, "@primitiveValue"];
+	add:	str := slot(l, "@primitiveValue");
 			  len := s-len (str);
 
 			  n := len - 1;
@@ -131,8 +130,8 @@ proc i__getAllEnumerableFieldsIter (l, props, b) {
 	inc:	n := n + 1;
 			goto loop;
 
-	next:	m := metadata(l);
-			l := [m, "@proto"];
+	next:	skip;
+			l := slot(l, "@proto");
 			goto [l = null] end deeper;
 
 	deeper:	ret := "i__getAllEnumerableFieldsIter" (l, props, b);
@@ -178,8 +177,8 @@ proc Object_construct (xsc, vthis, l) {
 proc Object_getPrototypeOf (xsc, vthis, o) {
 			ret := "i__toObject"(o) with elab;
 
-	proto:	m := metadata(ret);
-			ret := [m, "@proto"];
+	proto:	skip;
+			ret := slot(ret, "@proto");
 
 	rlab:   return;
 
@@ -235,8 +234,7 @@ proc Object_create (xsc, vthis, o, props) {
 			goto [(typeOf o = Obj) or (o = null)] main thrw;
 
 	main:	ret := "Object_construct" () with elab;
-			m := metadata(ret);
-			[m, "@proto"] := o;
+			slot(ret, "@proto") := o;
 
 			goto [props = undefined] rlab props;
 
@@ -300,8 +298,8 @@ proc Object_defineProperties (xsc, vthis, o, props) {
 proc Object_preventExtensions (xsc, vthis, o) {
 			goto [typeOf o = Obj] start ret_o;
 
-	start:	m := metadata(o);
-			[m, "@extensible"] := false;
+	start:	skip;
+			slot(o, "@extensible") := false;
 	ret_o:  ret := o;
 
 	rlab: return;
@@ -326,8 +324,8 @@ proc Object_seal (xsc, vthis, o) {
 	next:	n := n + 1;
 			goto loop;
 
-	ext:	m := metadata(o);
-			[m, "@extensible"] := false;
+	ext:	skip;
+			slot(o, "@extensible") := false;
 	ret_o:  ret := o;
 
 	rlab: return;
@@ -352,8 +350,8 @@ proc Object_isSealed (xsc, vthis, o) {
 	next:	n := n + 1;
 			goto loop;
 
-	ext:	m := metadata(o);
-			ret := [m, "@extensible"];
+	ext:	skip;
+			ret := slot(o, "@extensible");
 			goto [ret] r_f r_t;
 
 	r_t:	ret := true;
@@ -386,8 +384,8 @@ proc Object_freeze (xsc, vthis, o) {
 	next:	n := n + 1;
 			goto loop;
 
-	ext:	m := metadata(o);
-			[m, "@extensible"] := false;
+	ext:	skip;
+			slot(o, "@extensible") := false;
 	ret_o:  ret := o;
 
 	rlab: return;
@@ -413,8 +411,8 @@ proc Object_isFrozen (xsc, vthis, o) {
 	next:	n := n + 1;
 			goto loop;
 
-	ext:	m := metadata(o);
-			ret := [m, "@extensible"];
+	ext:	skip;
+			ret := slot(o, "@extensible");
 			goto [ret] r_f r_t;
 
 	r_t:	ret := true;
@@ -433,8 +431,8 @@ proc Object_isFrozen (xsc, vthis, o) {
 proc Object_isExtensible (xsc, vthis, o) {
 			goto [typeOf o = Obj] start ret_f;
 
-	start: 	m := metadata(o);
-		    ret := [m, "@extensible"];
+	start: 	skip;
+		    ret := slot(o, "@extensible");
 	rlab:   return;
 
 	ret_f:	ret := false;
@@ -484,8 +482,7 @@ proc OP_toString(xsc, vthis) {
 			goto rlab;
 
 	nnull:	ret := "i__toObject" (vthis) with elab;
-			m := metadata(ret);
-			c := [m, "@class"];
+			c := slot(ret, "@class");
 			ret := "[object " ++ c ++ "]";
 
 	rlab: return;
@@ -502,9 +499,9 @@ proc OP_toLocaleString(xsc, vthis) {
 			c := "i__isCallable" (ret);
             goto [c] call thrw;
 
-	call:	m := metadata(ret);
-			scp := [m, "@scope"];
-			fun := [m, "@call"];
+	call:	skip;
+			scp := slot(ret, "@scope");
+			fun := slot(ret, "@call");
 			ret := fun (scp, vthis) with elab;
 
 	rlab: return;
@@ -551,8 +548,8 @@ proc OP_isPrototypeOf(xsc, vthis, v) {
 
 	obj:	ret := "i__toObject" (vthis) with elab;
 
-	rep:	m := metadata(v);
-			v := [m, "@proto"];
+	rep:	skip;
+			v := slot(v, "@proto");
 			goto [v = null] fret nnull;
 
 	nnull:  goto [v = ret] tret rep;
@@ -592,8 +589,7 @@ proc OP_get_proto_acc (xsc, vthis) {
 
           ret := "i__toObject"(vthis) with elab;
 
-          ret := metadata(ret);
-          ret := [ret, "@proto"];
+          ret := slot(ret, "@proto");
 
           return;
     elab: throw
@@ -611,11 +607,11 @@ proc OP_set_proto_acc (xsc, vthis, o) {
 
 	cont:       goto [(typeOf vthis = Obj)] is_obj ret_undef;
 
-    is_obj:     m := metadata(vthis);
-                e := [m, "@extensible"];
+    is_obj:     skip;
+                e := slot(vthis, "@extensible");
                 goto [e] set thrw;
 
-	set:        [m, "@proto"] := o;
+	set:        slot(vthis, "@proto") := o;
                 return;
 
 	thrw:       ret := "TypeError" ();

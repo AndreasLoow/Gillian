@@ -18,13 +18,13 @@ proc create_default_object (pr, cl, ext) {
 	sext: ext := true;
 
         (* Create metadata and object *)
-  set:  m := new(null);
-        ret := new(m);
+  set:  skip;
+        ret := new();
 
         (* Set the internal properties in the metadata *)
-        [m, "@proto"] := pr;
-        [m, "@class"] := cl;
-        [m, "@extensible"] := ext;
+        slot(ret, "@proto") := pr;
+        slot(ret, "@class") := cl;
+        slot(ret, "@extensible") := ext;
 
         return
 };
@@ -37,13 +37,13 @@ proc create_default_object_concrete (l, pr, cl, ext) {
   sext: ext := true;
 
         (* Create metadata and object *)
-  set:  m := new(null);
-        ret := new(l, m);
+  set:  skip;
+        ret := new(l, null);
 
         (* Set the internal properties in the metadata *)
-        [m, "@proto"] := pr;
-        [m, "@class"] := cl;
-        [m, "@extensible"] := ext;
+        slot(ret, "@proto") := pr;
+        slot(ret, "@class") := cl;
+        slot(ret, "@extensible") := ext;
 
         ret := l;
         return
@@ -67,15 +67,14 @@ proc create_object_with_call_construct (call, construct, len) {
 			  [ret, "length"] := {{ "d", len, false, false, true }};
 
 			  (* Get the metadata *)
-			  m := metadata(ret);
 
 			  (* Set the internal scope, call and construct properties *)
-			  [m, "@scope"] := empty;
-			  [m, "@call"] := call;
+			  slot(ret, "@scope") := empty;
+			  slot(ret, "@call") := call;
 
 			  goto [construct = empty] rlab cstr;
 
-	cstr:	[m, "@construct"] := construct;
+	cstr:	slot(ret, "@construct") := construct;
 
   rlab: return
 };
@@ -94,15 +93,14 @@ proc create_object_with_call_construct_concrete (l, call, construct, len, opt_pr
         [ret, "length"] := {{ "d", len, false, false, true }};
 
         (* Get the metadata *)
-        m := metadata(ret);
 
         (* Set the internal scope, call and construct properties *)
-        [m, "@scope"] := empty;
-        [m, "@call"] := call;
+        slot(ret, "@scope") := empty;
+        slot(ret, "@call") := call;
 
         goto [construct = empty] rlab cstr;
 
-  cstr: [m, "@construct"] := construct;
+  cstr: slot(ret, "@construct") := construct;
 
   rlab: ret := l;
         return
@@ -123,8 +121,7 @@ proc create_function_object (xsc, call, construct, params) {
             len := l-len(params);
 			ret := "create_object_with_call_construct" (call, construct, len);
 
-             m := metadata(ret);
-			[m, "@scope"] := xsc;
+			slot(ret, "@scope") := xsc;
 
 			prototype := "Object_construct" ();
 			[prototype, "constructor"] := {{ "d", ret, true, false, true }};
@@ -264,8 +261,7 @@ proc setupInitialHeap () {
   			(* Function.prototype *)
 
    			ret := "create_object_with_call_construct_concrete" ($lfun_proto, "FP_default", empty, 0);
-   			m := metadata($lfun_proto);
-   			[m, "@proto"] := $lobj_proto;
+   			slot($lfun_proto, "@proto") := $lobj_proto;
 
   			[$lfun_proto, "constructor"] := {{ "d", $lfun, true, false, true }};
   			[$lfun_proto, "toString"]    := {{ "d", $lfp_toString, true, false, true }};
@@ -358,8 +354,7 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($lstr_proto, $lobj_proto, "String", true);
 
-			m := metadata($lstr_proto);
-			[m, "@primitiveValue"]             := "";
+			slot($lstr_proto, "@primitiveValue") := "";
 			[$lstr_proto, "length"]            := {{ "d", 0, false, false, true }};
 			[$lstr_proto, "constructor"]       := {{ "d", $lstr, true, false, true }};
 			[$lstr_proto, "toString"]          := {{ "d", $lsp_toString, true, false, true }};
@@ -416,8 +411,7 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($lbool_proto, $lobj_proto, "Boolean", true);
 
-			m := metadata($lbool_proto);
-			[m, "@primitiveValue"] := false;
+			slot($lbool_proto, "@primitiveValue") := false;
 
 			[$lbool_proto, "constructor"] := {{ "d", $lbool, true, false, true }};
 			[$lbool_proto, "toString"]    := {{ "d", $lbp_toString, true, false, true }};
@@ -448,8 +442,7 @@ proc setupInitialHeap () {
 
 			ret := "create_default_object_concrete" ($lnum_proto, $lobj_proto, "Number", true);
 
-			m := metadata($lnum_proto);
-			[m,           "@primitiveValue"]      := 0;
+			slot($lnum_proto, "@primitiveValue") := 0;
 			[$lnum_proto, "constructor"]          := {{ "d", $lnum, true, false, true }};
 			[$lnum_proto, "toString"]             := {{ "d", $lnp_toString, true, false, true }};
 			[$lnum_proto, "toLocaleString"]       := {{ "d", $lnp_toLocaleString, true, false, true }};
@@ -758,10 +751,9 @@ proc setupInitialHeap () {
 			(* Note, this object does not follow the standard Function object construction *)
 			ret := "create_default_object_concrete" ($lthrw_type_error, $lfun_proto, "Function", false);
 
-			m := metadata(ret);
-			[m, "@scope"] := empty;
+			slot(ret, "@scope") := empty;
 			slot(ret, "@formalParameters") := {{ }};
-			[m, "@call"] := "ThrowTypeError";
+			slot(ret, "@call") := "ThrowTypeError";
 			[ret, "length"] := {{ "d", 0, false, false, true }};
 
       ret := empty;

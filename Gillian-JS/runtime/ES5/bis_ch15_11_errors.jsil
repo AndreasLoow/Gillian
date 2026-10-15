@@ -7,9 +7,8 @@ import internal_functions.jsil;
 proc Error_construct (xsc, vthis, v) {
         ret := vthis;
 
-        m := metadata(vthis);
-        [m, "@class"] := "Error";
-        [m, "@extensible"] := true;
+        slot(vthis, "@class") := "Error";
+        slot(vthis, "@extensible") := true;
 
         goto [v = undefined] returnNormal message;
 

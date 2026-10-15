@@ -18,8 +18,7 @@ proc Boolean_construct (xsc, vthis, v) {
 
 			ret := "create_default_object" ($lbool_proto, "Boolean", true);
 
-			m := metadata(ret);
-			[m, "@primitiveValue"] := pv;
+			slot(ret, "@primitiveValue") := pv;
 
 	rlab: return
 };
@@ -33,10 +32,10 @@ proc BP_toString (xsc, vthis) {
 			goto test;
 
 	notb:	goto [typeOf vthis = Obj] class thrw;
-	class:	m := metadata(vthis);
-			c := [m, "@class"];
+	class:	skip;
+			c := slot(vthis, "@class");
 			goto [c = "Boolean"] b thrw;
-	b:		ret := [m, "@primitiveValue"];
+	b:		ret := slot(vthis, "@primitiveValue");
 	test:	goto [ret = true] rt rf;
 
 	rt:		ret := "true";
@@ -59,10 +58,10 @@ proc BP_valueOf (xsc, vthis) {
 			goto rlab;
 
 	notb:	goto [typeOf vthis = Obj] class thrw;
-	class:	m := metadata(vthis);
-			c := [m, "@class"];
+	class:	skip;
+			c := slot(vthis, "@class");
 			goto [c = "Boolean"] b thrw;
-	b:		ret := [m, "@primitiveValue"];
+	b:		ret := slot(vthis, "@primitiveValue");
 
 	rlab: return;
 

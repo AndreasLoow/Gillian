@@ -92,11 +92,7 @@ bug_variant() { # name expected-failure-message [known-issue-if-verified]
   fi
 }
 # pp: the duplicate-key check throws (prototype poisoning).
-# Known upstream bug since #391: the throwing path leaves a loop, and putting
-# the loop's frame back fails ("FRAMING ON RESULTED IN 0 STATES"), so the path
-# is dropped and the variant verifies. See the fix-produce-matching PR.
-bug_variant pp "Terminated with flag error instead of normal" \
-  "upstream frame-vanishing bug (#391), path dropped"
+bug_variant pp "Terminated with flag error instead of normal"
 # frozen: the returned empty encryption context is still extensible.
 bug_variant frozen "Couldn't satisfy postcondition"
 

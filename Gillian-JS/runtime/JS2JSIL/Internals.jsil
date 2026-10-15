@@ -66,8 +66,7 @@ proc i__toPrimitive (v, hint) {
  * Branch on class: string or non-string
  *)
 proc getOwnProperty (l, prop) {
-		  m := metadata(l);
-		  class := [m, "@class"];
+		  class := slot(l, "@class");
 
 		  goto [class = "String"] sgop ogop;
 
@@ -101,8 +100,8 @@ proc getProperty (l, prop) {
 		  ret := "getOwnProperty" (l, prop) with elab;
 		  goto [ret = undefined] next rlab;
 
-    next: m := metadata(l);
-          proto := [m, "@proto"];
+    next: skip;
+          proto := slot(l, "@proto");
           goto [proto = null] rlab call;
 
     call: ret := "getProperty" (proto, prop) with elab;
@@ -125,9 +124,9 @@ proc get (l, prop) {
 			goto [d = "d"] rlab acc;				(* Is it a data descriptor? *)
 
 	acc:	goto [ret = undefined] rlab get;		(* Is the getter defined?               *)
-	get:	m := metadata(ret);
-			xsc := [m, "@scope"];				(* Get the scope of the getter          *)
-			fun := [m, "@call"];					(* Get the name of the getter           *)
+	get:	skip;
+			xsc := slot(ret, "@scope");				(* Get the scope of the getter          *)
+			fun := slot(ret, "@call");					(* Get the name of the getter           *)
 			ret := fun (xsc, l) with elab;			(* Call the getter, errors could happen *)
 			goto [ret = empty] undef rlab;
 	undef:	ret := undefined;
@@ -150,8 +149,8 @@ proc canPut (l, prop) {
 	odd:	ret := l-nth (ret, 2);					(* It is; rtrn the Writable attribute *)
 			goto rlab;
 
-	nop:	m := metadata(l);
-			e := [m, "@extensible"];				   (* Get the extensible property *)
+	nop:	skip;
+			e := slot(l, "@extensible");				   (* Get the extensible property *)
 			ret := "getProperty" (l, prop) with elab; (* Does the property exist? *)
 			goto [ret = undefined] ext desc;		   (* It doesn't; rtrn extensible *)
 
@@ -193,9 +192,8 @@ proc put (l, prop, value, thrw) {
     		goto [ad] ad def;
 
     ad:		s := l-nth (ret, 2);
-    		m := metadata(s);
-    		xsc := [m, "@scope"];
-    		fun := [m, "@call"];
+    		xsc := slot(s, "@scope");
+    		fun := slot(s, "@call");
     		ret := fun (xsc, l, value) with elab;
     		goto remp;
 
@@ -255,8 +253,7 @@ proc defaultValue (l, hint) {
 			  goto [hint = empty] hint init;
 
 	hint:  hint := "Number";
-		   m := metadata(l);
-		   class := [m, "@class"];
+		   class := slot(l, "@class");
 		   goto [class = "Date"] hs init;
 	hs:	   hint := "String";
 
@@ -272,9 +269,9 @@ proc defaultValue (l, hint) {
     is_c:  c := "i__isCallable" (ret);
            goto [c] call next;
 
-    call:  m := metadata(ret);
-    	   xsc := [m, "@scope"];
-           fun := [m, "@call"];
+    call:  skip;
+    	   xsc := slot(ret, "@scope");
+           fun := slot(ret, "@call");
            ret := fun (xsc, l) with elab;
 		   goto [ret = empty] undef ispr;
 	undef: ret := undefined;
@@ -303,8 +300,7 @@ proc defaultValue (l, hint) {
  *)
 proc defineOwnProperty (l, prop, desc, thrw) {
 
-		  m := metadata(l);
-		  class := [m, "@class"];
+		  class := slot(l, "@class");
 
 		  goto [class = "Array"] adop odop;
 
@@ -323,8 +319,7 @@ proc o__defineOwnProperty (l, prop, desc, thrw) {
           ret_f := false;
 
           current := "getOwnProperty" (l, prop) with celab;
-          m := metadata(l);
-          extensible := [m, "@extensible"];
+          extensible := slot(l, "@extensible");
 
           goto [(current = undefined) and (extensible = false)] reject l4;
   l4:     goto [(current = undefined) and (extensible = true)] l4a getall;
@@ -721,9 +716,9 @@ proc i__getValue (v) {
 			goto [d = "d"] rlab acc;	(* Is it a data descriptor? *)
 
 	acc:	goto [ret = undefined] rlab get;	(* Is the getter defined? *)
-	get:	m := metadata(ret);
-			xsc := [m, "@scope"];	(* Get the scope of the getter *)
-			fun := [m, "@call"];	(* Get the name of the getter *)
+	get:	skip;
+			xsc := slot(ret, "@scope");	(* Get the scope of the getter *)
+			fun := slot(ret, "@call");	(* Get the name of the getter *)
 			ret := fun (xsc, rbase) with elab;	(* Call the getter, errors could happen *)
 			goto [ret = empty] undef rlab;
 	undef:	ret := undefined;
@@ -799,9 +794,8 @@ proc i__putValue (v, w) {
     		goto [ad] ad reject;
 
 	ad:	    s := l-nth (ret, 2);
-            m := metadata(s);
-            xsc := [m, "@scope"];
-            fun := [m, "@call"];
+            xsc := slot(s, "@scope");
+            fun := slot(s, "@call");
             ret := fun (xsc, rbase, w) with elab;
             goto dflt;
 
@@ -1038,8 +1032,9 @@ proc i__checkObjectCoercible (v) {
 proc i__isCallable (l) {
 			ret := false;
 			goto [typeOf l = Obj] obj rlab;
-	obj:	m := metadata(l);
-			ret := hasField(m, "@call");
+	obj:	skip;
+			ret := slot(l, "@call");
+   ret := not (ret = empty);
 	rlab: return
 };
 
@@ -1177,8 +1172,9 @@ proc i__typeOf (v) {
 			   goto rlab;
 
 	io:		 goto [typeOf v = Obj] obj oops;
-	obj:	 m := metadata(v);
-			   ret := hasField(m, "@call");
+	obj:	 skip;
+			   ret := slot(v, "@call");
+      ret := not (ret = empty);
 			   goto [ret] isfun isobj;
 
 	isobj: ret := "object";
@@ -1326,8 +1322,8 @@ proc i__checkParameters (fid, params) {
 (* *********** *)
 
 proc hasInstance(v1, v2) {
-			m := metadata(v1);
-			to_bind := hasField(m, "@targetFunction");
+			to_bind := slot(v1, "@targetFunction");
+   to_bind := not (to_bind = empty);
 			goto [to_bind] bind_l norm;
 
   bind_l:	ret := "FP_hasInstanceAfterBind" (v1, v2) with elab;
@@ -1346,8 +1342,8 @@ proc f__hasInstance(v1, v2) {
 	s2:		ret := "get" (v1, "prototype") with elab;
 			goto [not (typeOf (ret) = Obj)] thrw s4;
 
-	s4:		m := metadata(v2);
-			v2 := [m, "@proto"];
+	s4:		skip;
+			v2 := slot(v2, "@proto");
 			goto [v2 = null] rf s4c;
 	s4c:	goto [ret = v2] rt s4;
 
@@ -1374,9 +1370,9 @@ proc resolveVariable(scopeList, var) {
 	loop:	goto [ 0 <= current ] body rlab;
 
 	body: er_o := l-nth(scopeList, current);
-				er_m := metadata(er_o);
 
-				is_er := hasField(er_m, "@er");
+				is_er := slot(er_o, "@er");
+    is_er := not (is_er = false);
 				goto [ is_er ] er obj;
 
 	er:		has_var := hasField(er_o, var);
@@ -1401,18 +1397,10 @@ proc resolveVariable(scopeList, var) {
 proc isNativeError (err) {
 
         (* The error should be an object *)
-	      goto [typeOf(err) = Obj] md rf;
-
-        (* Get metadata, which should also be an object *)
-	md:   md := metadata(err);
-	      goto [typeOf(md) = Obj] hp rf;
-
-        (* The metadata should have the "@proto" field *)
-	hp:   hp := hasField(md, "@proto");
-	      goto [ hp ] gp rf;
+	      goto [typeOf(err) = Obj] gp rf;
 
         (* If the prototype is a native error prototype, return true; otherwise, false *)
-  gp:   proto := [md, "@proto"];
+  gp:   proto := slot(err, "@proto");
         goto [ (proto = $lterr_proto) or (proto = $lrferr_proto) or (proto = $lserr_proto) or (proto = $lrgerr_proto) ] rt rf;
 
         (* Throw error *)
@@ -1430,11 +1418,7 @@ proc isNativeError (err) {
 proc i__purge (o) {
         goto [typeOf(o) = Obj] del rlab;
 
-  del:  m := metadata(o);
-        goto [typeOf(m) = Obj] delm delo;
-
-  delm: deleteObject(m);
-  delo: deleteObject(o);
+  del:  deleteObject(o);
 
   rlab: ret := true;
         return
