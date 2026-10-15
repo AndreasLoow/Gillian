@@ -88,6 +88,15 @@ proc EvalError_call (xsc, vthis, v) {
 	elab: throw
 };
 
+(* The construct behaviour of EvalError, which JSCert distinguishes from that of
+   the other errors *)
+proc EvalError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
 proc EvalError (v) {
 			ret := "EvalError_call" (undefined, undefined, v) with elab;
 
@@ -101,6 +110,15 @@ proc RangeError_call (xsc, vthis, v) {
 			ret := "create_default_object" ($lrgerr_proto, "Error", true);
 
 			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* The construct behaviour of RangeError, which JSCert distinguishes from that of
+   the other errors *)
+proc RangeError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
 
 	rlab: return;
 	elab: throw
@@ -124,6 +142,15 @@ proc ReferenceError_call (xsc, vthis, v) {
 	elab: throw
 };
 
+(* The construct behaviour of ReferenceError, which JSCert distinguishes from that of
+   the other errors *)
+proc ReferenceError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
 proc ReferenceError (v) {
 			ret := "ReferenceError_call" (undefined, undefined, v) with elab;
 
@@ -137,6 +164,15 @@ proc SyntaxError_call (xsc, vthis, v) {
 			ret := "create_default_object" ($lserr_proto, "Error", true);
 
 			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* The construct behaviour of SyntaxError, which JSCert distinguishes from that of
+   the other errors *)
+proc SyntaxError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
 
 	rlab: return;
 	elab: throw
@@ -160,6 +196,15 @@ proc TypeError_call (xsc, vthis, v) {
 	elab: throw
 };
 
+(* The construct behaviour of TypeError, which JSCert distinguishes from that of
+   the other errors *)
+proc TypeError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
 proc TypeError (v) {
 			ret := "TypeError_call" (undefined, undefined, v) with elab;
 
@@ -175,6 +220,15 @@ proc URIError_call (xsc, vthis, v) {
 			ret := "create_default_object" ($luerr_proto, "Error", true);
 
 			ret := "Error_construct" (undefined, ret, v) with elab;
+
+	rlab: return;
+	elab: throw
+};
+
+(* The construct behaviour of URIError, which JSCert distinguishes from that of
+   the other errors *)
+proc URIError_construct (xsc, vthis, v) {
+			ret := "Error_construct" (xsc, vthis, v) with elab;
 
 	rlab: return;
 	elab: throw

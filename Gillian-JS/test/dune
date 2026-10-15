@@ -1,0 +1,3 @@
+(test
+ (name jscert_interface_test)
+ (libraries alcotest str gillian-js.javert_utils))

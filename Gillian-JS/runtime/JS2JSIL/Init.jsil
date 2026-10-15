@@ -706,12 +706,12 @@ proc setupInitialHeap () {
 
 			(* Native errors *)
 
-			ret := "create_object_with_call_construct_concrete" ($leerr,  "EvalError_call",      "Error_construct", 1, $lerr);
-			ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "Error_construct", 1, $lerr);
-			ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "Error_construct", 1, $lerr);
-			ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "Error_construct", 1, $lerr);
-			ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "Error_construct", 1, $lerr);
-			ret := "create_object_with_call_construct_concrete" ($luerr,  "URIError_call",       "Error_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($leerr,  "EvalError_call",      "EvalError_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "RangeError_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "ReferenceError_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "SyntaxError_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "TypeError_construct", 1, $lerr);
+			ret := "create_object_with_call_construct_concrete" ($luerr,  "URIError_call",       "URIError_construct", 1, $lerr);
 
 			[$leerr,  "prototype"] := {{ "d", $leerr_proto, false, false, false }};
 			[$lrgerr, "prototype"] := {{ "d", $lrgerr_proto, false, false, false }};

@@ -5,6 +5,7 @@
    that one program runs on both. *)
 
 open Gil_syntax
+
 module LMap = Map.Make (struct
   type t = Literal.t
 
@@ -19,9 +20,7 @@ module type S = sig
 
   val pp : t Fmt.t
   val instantiate : Literal.t list -> t * Literal.t list
-
-  val execute_action :
-    string -> t -> Literal.t list -> (t * Literal.t list) res
+  val execute_action : string -> t -> Literal.t list -> (t * Literal.t list) res
 end
 
 let err msg vs = Error (Err (Literal.String msg :: vs))
@@ -101,9 +100,13 @@ module Product (IDs : MyUtils.IDs) (S1 : S) (S2 : S) :
   let execute_action a (s1, s2) args =
     match IDer.get_ided a with
     | ID1 a ->
-        Result.map (fun (s1, vs) -> ((s1, s2), vs)) (S1.execute_action a s1 args)
+        Result.map
+          (fun (s1, vs) -> ((s1, s2), vs))
+          (S1.execute_action a s1 args)
     | ID2 a ->
-        Result.map (fun (s2, vs) -> ((s1, s2), vs)) (S2.execute_action a s2 args)
+        Result.map
+          (fun (s2, vs) -> ((s1, s2), vs))
+          (S2.execute_action a s2 args)
     | NotIDed a -> unknown_action a
 end
 
@@ -153,8 +156,8 @@ end
 
 (* Adds an action listing the keys of a state, as determined by the
    specification. *)
-module Keys (S : S) (Spec : KeysSpec with type t = S.t) :
-  S with type t = S.t = struct
+module Keys (S : S) (Spec : KeysSpec with type t = S.t) : S with type t = S.t =
+struct
   include S
 
   let execute_action a s args =
@@ -210,14 +213,16 @@ end
 module Mapper (N : Mapper.NameMap) (S : S) : S with type t = S.t = struct
   include S
 
-  let execute_action a = S.execute_action (Mapper.subst N.action_substitutions a)
+  let execute_action a =
+    S.execute_action (Mapper.subst N.action_substitutions a)
 end
 
 (* Only the actions named by the filter are available. *)
-module Filter (F : sig
-  val actions : string list
-end)
-(S : S) : S with type t = S.t = struct
+module Filter
+    (F : sig
+      val actions : string list
+    end)
+    (S : S) : S with type t = S.t = struct
   include S
 
   let execute_action a =

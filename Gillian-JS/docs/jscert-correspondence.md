@@ -131,10 +131,20 @@ there):
 - Arguments objects keep the default methods: the code is strict, and
   JSCert's `args_obj` variants are for non-strict arguments objects.
 
+- A built-in function has the procedures implementing it in `@call` and
+  `@construct`. These play the role of JSCert's `call_prealloc p` and
+  `construct_prealloc p`: `builtins` in `JSCertInterface.ml` gives the
+  procedures for each of JSCert's 82 `prealloc`s, and a `prealloc` that Gillian
+  does not implement is named by itself. On the CSE side the names are the
+  parameter `JS_Slots.Prealloc_Table` (injective, and distinct from
+  `"default"` and `"after_bind"`), which this table instantiates;
+  `Gillian-JS/test` checks those properties and that the initial heap
+  installs these procedures. Each native error has its own construct procedure
+  (`EvalError_construct`, …), as JSCert distinguishes them. Built-ins that
+  JSCert lacks (ES6+ ones, `Date`, `Math` beyond `abs`, …) are outside the
+  simulated fragment.
+
 **Still to align with JSCert:**
-- Built-in functions keep their implementing procedure in `@call` and
-  `@construct`; JSCert uses `call_prealloc`/`construct_prealloc`, which needs
-  Gillian's built-ins to be preallocated objects.
 - `@scope` holds a list of environment-record objects (decision 2).
 - The Gillian side does not type-check `SetSlot`.
 

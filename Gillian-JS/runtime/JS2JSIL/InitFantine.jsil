@@ -525,10 +525,10 @@ proc setupInitialHeap () {
 
       (* Native errors *)
 
-      ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "Error_construct", 1);
-      ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "Error_construct", 1);
-      ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "Error_construct", 1);
-      ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "Error_construct", 1);
+      ret := "create_object_with_call_construct_concrete" ($lrgerr, "RangeError_call",     "RangeError_construct", 1);
+      ret := "create_object_with_call_construct_concrete" ($lrferr, "ReferenceError_call", "ReferenceError_construct", 1);
+      ret := "create_object_with_call_construct_concrete" ($lserr,  "SyntaxError_call",    "SyntaxError_construct", 1);
+      ret := "create_object_with_call_construct_concrete" ($lterr,  "TypeError_call",      "TypeError_construct", 1);
 
       [$lrgerr, "prototype"] := {{ "d", $lrgerr_proto, false, false, false }};
       [$lrferr, "prototype"] := {{ "d", $lrferr_proto, false, false, false }};
