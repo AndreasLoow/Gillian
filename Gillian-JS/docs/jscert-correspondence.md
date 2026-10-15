@@ -75,7 +75,7 @@ Gillian side, where a `PMap` entry is a single `DynCell`.
 | `GetCell(l, p) → attrs \| none` | heap → properties → `DynCell lookup` | `Heap.read_option (object_properties_ O) p` |
 | `SetCell(l, p, attrs)` | … → `DynCell mutate` | `object_set_property` |
 | `DeleteCell(l, p)` | … → `DynCell delete` | `object_rem_property` |
-| `GetAllProps(l) → [p…]` | properties domain; CSE: `keys_mm`'s `act_keys` (`js_theories/Keys.v`) | the names of the properties of `object_properties_`, once each, in any order |
+| `GetAllProps(l) → [p…]` | properties domain; CSE: `keys_mm`'s `act_keys` (`js_theories/Keys.v`), which symbolically answers fresh variables that are a permutation of the keys holding values, when the domain names exactly the map's properties | the names of the properties of `object_properties_`, once each, in any order |
 | `GetSlot(l, f) → v` | heap → slots → `Exclusive load` at `f` | the field `f` of the object at `l` |
 | `SetSlot(l, f, v)` | … → `Exclusive store` at `f` | `object_write` with field `f` updated |
 
