@@ -8,7 +8,7 @@ module JSCI = Javert_utils.JSCertInterface
 module StringIndex = struct
   include StringIndex
 
-  let default_instantiation = [ Expr.Lit Nono ]
+  let default_instantiation _ = [ Expr.Lit Nono ]
 end
 
 (* An object: its properties and its slots. Neither side takes arguments when
@@ -85,15 +85,15 @@ module JSSubst : NameMap = struct
       ("GetAllProps", "left_inner_get_domainset");
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
-      ("GetSlot", "right_lookup");
-      ("SetSlot", "right_mutate");
+      ("GetSlot", "right_load");
+      ("SetSlot", "right_store");
     ]
 
   let pred_substitutions =
     [
       ("Cell", "left_dyn");
       ("Props", "left_inner_domainset");
-      ("Slot", "right_slot");
+      ("Slot", "right_ex");
       ("SlotsDomain", "right_domainset");
     ]
 end
@@ -164,7 +164,8 @@ end) =
     end)
     (S)
 
-(* Slot names are fixed: see JSCertInterface *)
+(* Slot names are fixed (see JSCertInterface), so an index is resolved to a
+   name, branching over the names if need be. A slot's default is its own. *)
 module SlotIndex : PMapIndex = struct
   let mode : index_mode = Dynamic
 
@@ -172,84 +173,55 @@ module SlotIndex : PMapIndex = struct
     | Expr.Lit (String n) as e when JSCI.is_slot_name n ->
         Delayed.return (Some e)
     | Expr.Lit _ -> Delayed.return None
-    | e -> Delayed.return (Some e)
+    | e ->
+        let open Expr.Infix in
+        let names = List.map (fun n -> Expr.string n) JSCI.slot_names in
+        Delayed.branches
+          (Delayed.return
+             ~learned:[ not (Expr.BinOp (e, SetMem, Expr.ESet names)) ]
+             None
+          :: List.map
+               (fun n -> Delayed.return ~learned:[ e == n ] (Some n))
+               names)
 
   let make_fresh () = failwith "Invalid in dynamic mode"
-  let default_instantiation = []
+
+  let default_instantiation = function
+    | Expr.Lit (String n) ->
+        Option.fold ~none:[]
+          ~some:(fun v -> [ Expr.Lit v ])
+          (JSCI.slot_default n)
+    | _ -> []
 end
 
-(* An object's slots. A slot outside the domain set is in its default state;
-   allocation leaves every slot in it. A slot's cell takes the slot's name as
-   its first argument, so actions and predicates on a slot repeat its index. *)
-module SlotsBase = struct
-  include PMap (SlotIndex) (SlotCell)
-
-  let is_not_default ((h, _) : t) idx =
-    match ExpMap.find_opt idx h with
-    | Some (Some SlotCell.Default) -> false
-    | _ -> true
-end
-
-(* As for properties, a slot read in its default state joins the domain set,
-   but is not part of the domain the predicates describe *)
-module PatchDomainsetSlots =
-  Injector
-    (struct
-      include DummyInject (SlotsBase)
-
-      let post_consume p (s, outs) =
-        match (p, outs) with
-        | "domainset", [ Expr.ESet dom ] ->
-            let dom = List.filter (SlotsBase.is_not_default s) dom in
-            Delayed.return (s, [ Expr.ESet dom ])
-        | _ -> Delayed.return (s, outs)
-    end)
-    (SlotsBase)
-
+(* An object's slots. A slot outside the domain set holds its default;
+   allocation leaves every slot outside it. *)
 module Slots = struct
-  include MoveInToOut (PatchDomainsetSlots)
+  include MoveInToOut (PMap (SlotIndex) (Exclusive))
 
   let instantiate = function
     | [] -> ((fst (empty ()), Some (Expr.ESet [])), [])
     | _ -> failwith "Invalid Slots instantiation"
 
-  let slot_pred = Option.get (pred_from_str "slot")
-  let domainset_pred = Option.get (pred_from_str "domainset")
+  let load = Option.get (action_from_str "load")
 
-  (* The cells cannot state their own assertions, which need their names. A
-     slot in its default state is described by the domain set alone. *)
-  let assertions ((h, d) : t) =
-    ExpMap.fold
-      (fun k c acc ->
-        match c with
-        | Some (SlotCell.Val v) -> (slot_pred, [ k; k ], [ v ]) :: acc
-        | _ -> acc)
-      h []
-    @ Option.fold ~none:[]
-        ~some:(fun d ->
-          let d =
-            match d with
-            | Expr.ESet ks ->
-                Expr.ESet (List.filter (SlotsBase.is_not_default (h, None)) ks)
-            | d -> d
-          in
-          [ (domainset_pred, [ d ], []) ])
-        d
-
-  let get_fixes e =
-    get_fixes e
-    |> Gillian.Combinators.Fix.map_corepred (fun (p, ins, outs) ->
-           match ins with
-           | k :: ins when p = slot_pred -> (p, k :: k :: ins, outs)
-           | _ -> (p, ins, outs))
-
-  let pp ft ((h, d) : t) =
-    let open Fmt in
-    let pp_bindings =
-      iter_bindings ~sep:comma ExpMap.iter
-        (hbox (pair ~sep:(any ": ") Expr.pp SlotCell.pp))
-    in
-    pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
+  (* Reading a slot outside the domain set leaves it there, so that the domain
+     set goes on describing it. *)
+  let execute_action a ((h, d) as s : t) args =
+    let open Delayed.Syntax in
+    match (d, args) with
+    | Some d, idx :: _ when a = load -> (
+        let* idx_opt = SlotIndex.is_valid_index idx in
+        match idx_opt with
+        | Some (Expr.Lit (String n) as idx') when not (ExpMap.mem idx' h) ->
+            if%sat Expr.BinOp (idx', SetMem, d) then execute_action a s args
+            else
+              let v = Option.get (JSCI.slot_default n) in
+              Delayed_result.ok
+                ~learned:[ Expr.Infix.(idx == idx') ]
+                (s, [ idx'; Expr.Lit v ])
+        | _ -> execute_action a s args)
+    | _ -> execute_action a s args
 end
 
 (* The content of memory at a given location: properties * slots *)

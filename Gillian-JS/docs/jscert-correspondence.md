@@ -19,8 +19,8 @@ the CSE model to JSCert's object heap.
 |---|---|---|---|
 | Heap | `OpenPMap(LocationIndex)` | `map_mm Nat` (`JS_Object.js_heap`) | `Heap.heap object_loc object` |
 | Object | `Product` of properties and slots | `prod_mm` (`js_object`), initialising both sides | `object` |
-| Properties | `PMap(StringIndex)` with domain set, over `DynCell` | `js_map_mm` over `DynCell` (`js_block`) | `object_properties_` |
-| Slots | `PMap(SlotIndex)` with domain set, over `SlotCell` | `js_map_mm` over `SlotCell` (`js_slots`) | the other 23 fields of `object` |
+| Properties | `PMap(StringIndex)` with domain set, over `DynCell` | `js_map_mm` over `DynCell` (`js_props`) | `object_properties_` |
+| Slots | `PMap(SlotIndex)` with domain set, over `Exclusive` | `slot_map_mm` (`js_slots`) | the other 23 fields of `object` |
 
 - A property outside the domain is absent; a slot outside the domain is in its
   default state.
@@ -32,12 +32,19 @@ the CSE model to JSCert's object heap.
 - An absent cell holds `none` on the Gillian side and is `DC_absent` on the CSE
   side, which reads back as `VUndef`.
 
-**`SlotCell`** (`Gillian-JS/lib/Memory/SlotCell.ml`, `js_theories/SlotCell.v`).
-- Actions `lookup [k]`, `mutate [k; v]`; predicate `slot [k]; [v]`, CSE resource
-  `rm_slot`. The slot's name `k` is the first argument, since a default state
-  reads back as the default of that slot.
-- The predicate describes a slot holding a value; a slot in its default state
-  is described by the domain alone.
+**Slots** (`Slots` in `Gillian-JS/lib/Memory/JSILMemory.ml`, `js_theories/SlotMap.v`).
+- Actions `load [k]`, `store [k; v]`; predicate `ex [k]; [v]`, CSE resource
+  `rm_slot`.
+- A slot outside the domain set holds its own default (`SlotIndex`'s
+  `default_instantiation`, `dom_default` in CSE). The domain is exclusive on
+  both sides, and its CSE resource `rm_slots_dom` owns every slot outside the
+  set as well.
+- Reading a slot outside the domain set leaves the state unchanged; writing
+  it, or consuming its `ex`, brings it into the map and its name into the
+  domain set.
+- A key that is not a literal is resolved by branching over the slot names.
+- The CSE side rejects a write of a value outside the slot's type. The
+  Gillian side does not check types yet (A7).
 
 ## 2. Actions
 
@@ -48,11 +55,11 @@ the CSE model to JSCert's object heap.
 | `SetCell(l, p, attrs)` | … → `DynCell mutate` | `object_set_property` |
 | `DeleteCell(l, p)` | … → `DynCell delete` | `object_rem_property` |
 | `GetAllProps(l) → [p…]` | properties domain | the domain of `object_properties_` (planned: a keys action on the CSE side) |
-| `GetSlot(l, f, f) → v` | heap → slots → `SlotCell lookup [f]` | the field `f` of the object at `l` |
-| `SetSlot(l, f, f, v)` | … → `SlotCell mutate [f; v]` | `object_write` with field `f` updated |
+| `GetSlot(l, f) → v` | heap → slots → `Exclusive load` at `f` | the field `f` of the object at `l` |
+| `SetSlot(l, f, v)` | … → `Exclusive store` at `f` | `object_write` with field `f` updated |
 
 - In JSIL, `x := slot(l, f)` and `slot(l, f) := v` compile to `GetSlot` and
-  `SetSlot`, repeating `f`.
+  `SetSlot`.
 - `DeleteObject` is only used for clean-up, and is outside the simulation.
 
 ## 3. Core predicates
@@ -61,8 +68,8 @@ the CSE model to JSCert's object heap.
 |---|---|---|
 | `Cell(l, p; attrs)` | the property `p` of `l`; `none` means owned and absent | `DynCell.rm_cell` |
 | `Props(l, D)` | every property of `l` outside `D` is owned and absent | properties domain |
-| `Slot(l, f, f; v)` | the slot `f` of `l` holds `v` | `SlotCell.rm_slot` |
-| `SlotsDomain(l, D)` | every slot of `l` outside `D` is owned and default | slots domain |
+| `Slot(l, f; v)` | the slot `f` of `l` holds `v` | `SlotMap.rm_slot` |
+| `SlotsDomain(l, D)` | the domain, and every slot of `l` outside `D`, owned and default | `SlotMap.rm_slots_dom` |
 
 In JSIL logic these are `((l, p) -> attrs)`, `empty_fields(l : D)`,
 `Slot(l, f, v)` and `slots_domain(l : D)`.
