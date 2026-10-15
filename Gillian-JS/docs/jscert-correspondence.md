@@ -48,6 +48,17 @@ it is lifted through CSE's whole-memory transfer theorems.
 - The CSE side rejects a write of a value outside the slot's type. The
   Gillian side does not check types yet (A7).
 
+**Concrete memory** (`Concrete` in `Gillian-JS/lib/Memory/JSILMemory.ml`,
+`GillianCore/combinators/CCombinators.ml`).
+- Built from concrete counterparts of the same combinators, which follow the
+  concrete (`cmm_*`) side of the CSE ones: `Heap` (`map_mm`, allocating with
+  `CE_new`), `Product` (`prod_mm`), `TotalMap` over `DynCell` with `Keys`
+  (`js_map_mm`, `keys_mm`), and `TotalMap` over `Exclusive` (`slot_map_mm`).
+- The whole concrete memory owns every property and slot of an object, absent
+  or default until written, so it needs no domain set (CSE's concrete slot map
+  keeps its domain token only for frames). A missing resource is a miss
+  and a malformed action an error, both of which fail concrete execution.
+
 ## 2. Actions
 
 | Action (ins → outs) | Path | JSCert |

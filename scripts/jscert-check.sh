@@ -7,6 +7,7 @@
 #   3. the two AWS bug variants, each of which must fail *for its documented
 #      reason* (see Gillian-JS/Examples/Amazon/README.md)
 #   4. the JaVerT verification examples and Cosette symbolic tests
+#   5. concrete execution of the examples in Gillian-JS/Examples/Concrete
 #
 # Prints one PASS/FAIL/KNOWN line per check and exits non-zero if any check
 # fails. KNOWN marks a failure caused by a known upstream bug; it does not fail
@@ -130,6 +131,19 @@ for f in BST/bst_find_1 BST/bst_find_min_1 BST/bst_insert_1 BST/bst_remove_1 \
     report "cosette/${f#../}" PASS ""
   else
     report "cosette/${f#../}" FAIL "rc=$rc, see $log"
+  fi
+done
+
+# 5. Concrete execution: each example throws if one of its checks fails.
+for f in Examples/Concrete/*.js; do
+  name=$(basename "$f" .js)
+  log="$LOGS/concrete-$name.log"
+  "$GJS" exec "$f" -l disabled > "$log" 2>&1
+  rc=$?
+  if [[ $rc -eq 0 ]]; then
+    report "concrete/$name" PASS ""
+  else
+    report "concrete/$name" FAIL "rc=$rc, see $log"
   fi
 done
 

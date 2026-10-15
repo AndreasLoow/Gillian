@@ -210,18 +210,16 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
   | LBasic (Assignment (x, e)) -> [ (lab, GCmd.Assignment (x, fe e)) ]
   (*
       C(x := new(l1, l2) :-
-        lab: aux1 := [new](l1, l2);
+        lab: aux1 := [new](l1);
         aux2 := l-nth(aux1, 0)
 
+      Objects have no metadata, so l2 is ignored.
     *)
-  | LBasic (New (x, e1, e2)) ->
+  | LBasic (New (x, e1, _)) ->
       let e1 = fe @@ Option.value ~default:(Expr.Lit Empty) e1 in
-      let e2 = fe @@ Option.value ~default:(Expr.Lit Null) e2 in
       let aux1 = fresh_var () in
       let e' = Expr.BinOp (Expr.PVar aux1, LstNth, Expr.zero_i) in
-      let cmd1 : string GCmd.t =
-        GCmd.LAction (aux1, JSILNames.alloc, [ e1; e2 ])
-      in
+      let cmd1 : string GCmd.t = GCmd.LAction (aux1, JSILNames.alloc, [ e1 ]) in
       let cmd2 : string GCmd.t = Assignment (x, e') in
       [ (lab, cmd1); (None, cmd2) ]
   (*

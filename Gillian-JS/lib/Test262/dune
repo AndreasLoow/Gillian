@@ -2,6 +2,7 @@
  (name test262)
  (libraries
   semantics
+  js_memory
   javert_utils
   gillian
   js2jsil_lib

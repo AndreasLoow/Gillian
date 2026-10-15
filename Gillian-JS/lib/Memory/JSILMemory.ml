@@ -330,10 +330,8 @@ module PatchedALocPMap (S : MyMonadicSMemory) = struct
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
 end
 
-(* When allocating, two params are given:
-    - the address to allocate into (can be 'empty' to generate new address) - defaults to empty
-    - the legacy metadata address, which is ignored: objects have no metadata
-   Similarly to WISL, return the index on each action. *)
+(* Allocation takes the address to allocate into, or 'empty' for a new
+   address. Similarly to WISL, return the index on each action. *)
 module PatchAlloc (Map : OpenPMapType) = struct
   include Map
 
@@ -341,7 +339,7 @@ module PatchAlloc (Map : OpenPMapType) = struct
   let[@inline] execute_action a s args =
     let open Delayed.Syntax in
     match (action_to_str a, args) with
-    | "alloc", [ idx; v ] ->
+    | "alloc", [ idx ] ->
         let* idx =
           match idx with
           | Expr.Lit Empty -> Delayed.return (Some (ALoc.alloc ()))
@@ -354,7 +352,7 @@ module PatchAlloc (Map : OpenPMapType) = struct
               failwith "Invalid index given for alloc (no error handles this)"
         in
         let idx = Expr.loc_from_loc_name idx in
-        let ss, v = Map.Entry.instantiate [ v ] in
+        let ss, v = Map.Entry.instantiate [] in
         let s' = set ~idx ~idx':idx ss s in
         Delayed_result.ok (s', idx :: v)
     | "alloc", _ -> failwith "Invalid arguments for alloc"
@@ -380,3 +378,78 @@ module Symbolic =
   Gillian.Combinators.MyMonadicSMemory.Make
     (MonadicSMemory_Base)
     (Gillian.Combinators.MyMonadicSMemory.DummyID)
+
+(* The concrete memory, from the concrete counterparts of the combinators
+   above, so that concrete and symbolic execution share the memory model. *)
+module Concrete = struct
+  module C = Gillian.Combinators.CCombinators
+
+  module Props =
+    C.TotalMap
+      (C.DynCell)
+      (struct
+        type entry = C.DynCell.t
+
+        let is_key = function
+          | Literal.String _ -> true
+          | _ -> false
+
+        let default _ = Some C.DynCell.Absent
+      end)
+
+  module PropsWithKeys =
+    C.Keys
+      (Props)
+      (struct
+        type t = Props.t
+
+        let keys m =
+          List.filter_map
+            (function
+              | k, Some (C.DynCell.Val _) -> Some k
+              | _ -> None)
+            (Props.bindings m)
+      end)
+
+  module Slots =
+    C.TotalMap
+      (C.Exclusive)
+      (struct
+        type entry = C.Exclusive.t
+
+        let is_key = function
+          | Literal.String n -> JSCI.is_slot_name n
+          | _ -> false
+
+        let default = function
+          | Literal.String n -> JSCI.slot_default n
+          | _ -> None
+      end)
+
+  module Object = C.Product (IDs) (PropsWithKeys) (Slots)
+
+  module Names : NameMap = struct
+    let action_substitutions =
+      [
+        ("GetCell", "left_lookup");
+        ("SetCell", "left_mutate");
+        ("DeleteCell", "left_delete");
+        ("GetAllProps", "left_keys");
+        ("Alloc", "alloc");
+        ("DeleteObject", "free");
+        ("GetSlot", "right_load");
+        ("SetSlot", "right_store");
+      ]
+
+    let pred_substitutions = []
+  end
+
+  include
+    C.Make
+      (Gillian.General.Init_data.Dummy)
+      (C.Filter
+         (struct
+           let actions = JSFilter.action_filters
+         end)
+         (C.Mapper (Names) (C.Heap (Object))))
+end

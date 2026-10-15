@@ -3,7 +3,7 @@ module SMemory = Js_memory.JSILMemory.Symbolic
 module CLI =
   Gillian.Command_line.Make
     (Gillian.General.Init_data.Dummy)
-    (Semantics.Concrete)
+    (Js_memory.JSILMemory.Concrete)
     (SMemory)
     (Js2jsil_lib.JS2GIL_ParserAndCompiler)
     (Semantics.External)
