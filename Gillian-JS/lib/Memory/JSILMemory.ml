@@ -11,9 +11,8 @@ module StringIndex = struct
   let default_instantiation _ = [ Expr.Lit Nono ]
 end
 
-(* left side is a PMap that doesn't need any arguments, while
-   the right hand side is an Agreement that requires the value.
-   Split accordingly (unpatched product gives the args to both sides) *)
+(* An object: its properties and its slots. Neither side takes arguments when
+   allocated. *)
 module PatchedProduct
     (IDs : IDs)
     (S1 : Gillian.Combinators.MyMonadicSMemory.S)
@@ -21,12 +20,12 @@ module PatchedProduct
   Gillian.Combinators.MyMonadicSMemory.S with type t = S1.t * S2.t = struct
   include Product (IDs) (S1) (S2)
 
-  let instantiate v =
+  let instantiate _ =
     let s1, v1 = S1.instantiate [] in
-    let s2, v2 = S2.instantiate v in
+    let s2, v2 = S2.instantiate [] in
     ((s1, s2), v1 @ v2)
 
-  let pp ft (s1, s2) = Fmt.pf ft "%a with metadata %a" S1.pp s1 S2.pp s2
+  let pp ft (s1, s2) = Fmt.pf ft "%a, slots %a" S1.pp s1 S2.pp s2
 end
 
 (* Add an action to delete objects *)
@@ -86,18 +85,16 @@ module JSSubst : NameMap = struct
       ("GetAllProps", "left_inner_get_domainset");
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
-      ("GetMetadata", "right_left_load");
-      ("GetSlot", "right_right_load");
-      ("SetSlot", "right_right_store");
+      ("GetSlot", "right_load");
+      ("SetSlot", "right_store");
     ]
 
   let pred_substitutions =
     [
       ("Cell", "left_dyn");
       ("Props", "left_inner_domainset");
-      ("Metadata", "right_left_ag");
-      ("Slot", "right_right_ex");
-      ("SlotsDomain", "right_right_domainset");
+      ("Slot", "right_ex");
+      ("SlotsDomain", "right_domainset");
     ]
 end
 
@@ -118,13 +115,12 @@ module JSFilter : FilterVals = struct
       "DeleteCell";
       "Alloc";
       "DeleteObject";
-      "GetMetadata";
       "GetAllProps";
       "GetSlot";
       "SetSlot";
     ]
 
-  let preds_filters = [ "Cell"; "Props"; "Metadata"; "Slot"; "SlotsDomain" ]
+  let preds_filters = [ "Cell"; "Props"; "Slot"; "SlotsDomain" ]
 end
 
 (* Patch domainset to filter out all Nonos *)
@@ -207,29 +203,12 @@ module Slots = struct
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
 end
 
-(* The legacy metadata address and the slots. The metadata address goes once
-   the internal fields have moved into the slots. *)
-module MetadataAndSlots = struct
-  include Product (IDs) (Agreement) (Slots)
-
-  let instantiate v =
-    let s1, _ = Agreement.instantiate v in
-    let s2, _ = Slots.instantiate [] in
-    ((s1, s2), [])
-
-  let pp ft (s1, s2) = Fmt.pf ft "%a, slots %a" Agreement.pp s1 Slots.pp s2
-end
-
-(* The content of memory at a given location: object * (metadata address,
-   slots) *)
+(* The content of memory at a given location: properties * slots *)
 module BaseMemoryContent (S : MyMonadicSMemory) = struct
   module S =
-    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S)))
-      (MetadataAndSlots)
+    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (Slots)
 
   include ActionAdder (DeleteActionAddition (S)) (S)
-
-  let get_metadata (_, (s2, _)) = s2
 end
 
 (* Override pretty printing, implement `is_not_nono` *)
@@ -302,12 +281,7 @@ module SplitObjectBase = struct
 end
 
 (* Patch map pretty-printing for nicer diffs *)
-module PatchedBasePMap (S : sig
-  include MyMonadicSMemory
-
-  val get_metadata : t -> Expr.t option
-end) =
-struct
+module PatchedBasePMap (S : MyMonadicSMemory) = struct
   include OpenPMap (LocationIndex) (S)
 
   let pp ft (h : t) =
@@ -319,44 +293,10 @@ struct
       pf ft "@[%a |-> %a@]" Expr.pp loc S.pp fv_pairs
     in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
-
-  (* As in [PatchedALocPMap]: when recovery should unfold around a location,
-     also unfold around the objects whose metadata it is. Otherwise a missing
-     internal property of a metadata object (e.g. its "@class") can only be
-     recovered by unfolding unrelated predicates until one happens to work. *)
-  let get_recovery_tactic s e =
-    let current_recovery = get_recovery_tactic s e in
-    match current_recovery.try_unfold with
-    | Some l ->
-        let alocs =
-          List.filter
-            (function
-              | Expr.ALoc _ | Lit (Loc _) -> true
-              | _ -> false)
-            l
-        in
-        if List.is_empty alocs then current_recovery
-        else
-          let to_add =
-            ExpMap.fold
-              (fun key obj acc ->
-                match S.get_metadata obj with
-                | Some e when List.exists (Expr.equal e) alocs -> key :: acc
-                | _ -> acc)
-              s []
-          in
-          let try_unfold = Some (List.sort_uniq Expr.compare (to_add @ l)) in
-          { current_recovery with try_unfold }
-    | None -> current_recovery
 end
 
 (* Patch map pretty-printing for nicer diffs *)
-module PatchedALocPMap (S : sig
-  include MyMonadicSMemory
-
-  val get_metadata : t -> Expr.t option
-end) =
-struct
+module PatchedALocPMap (S : MyMonadicSMemory) = struct
   include OpenALocPMap (S)
 
   let pp ft (h : t) =
@@ -367,45 +307,12 @@ struct
     in
     let pp_one ft (loc, fv_pairs) = pf ft "@[%s |-> %a@]" loc S.pp fv_pairs in
     (list ~sep:(any "@\n") pp_one) ft sorted_locs_with_vals
-
-  let get_recovery_tactic s e =
-    let current_recovery =
-      (* We use the regular recovery tactic of the map *)
-      get_recovery_tactic s e
-    in
-    match current_recovery.try_unfold with
-    | Some l ->
-        let alocs =
-          List.filter
-            (function
-              | Expr.ALoc _ | Lit (Loc _) -> true
-              | _ -> false)
-            l
-        in
-        if List.is_empty alocs then
-          (* Saves us some iterations *)
-          current_recovery
-        else
-          let locs_to_add =
-            Gillian.Combinators.MyUtils.SMap.fold
-              (fun key obj acc ->
-                match S.get_metadata obj with
-                | Some e when List.exists (Expr.equal e) alocs -> key :: acc
-                | _ -> acc)
-              s []
-          in
-          let expr_to_add = List.map Expr.loc_from_loc_name locs_to_add in
-          let try_unfold =
-            Some (List.sort_uniq Expr.compare (expr_to_add @ l))
-          in
-          { current_recovery with try_unfold }
-    | None -> current_recovery
 end
 
 (* When allocating, two params are given:
     - the address to allocate into (can be 'empty' to generate new address) - defaults to empty
-    - the metadata address, which is the value of the agreement (rhs of the object product) - defaults to null
-   Need to take that into consideration + similarly to WISL, return the index on each action. *)
+    - the legacy metadata address, which is ignored: objects have no metadata
+   Similarly to WISL, return the index on each action. *)
 module PatchAlloc (Map : OpenPMapType) = struct
   include Map
 
