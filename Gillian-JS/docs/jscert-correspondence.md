@@ -152,8 +152,13 @@ there):
   JSCert lacks (ES6+ ones, `Date`, `Math` beyond `abs`, …) are outside the
   simulated fragment.
 
-**Still to align with JSCert:**
-- `@scope` holds a list of environment-record objects (decision 2).
+**Environment records (decisions 2 and D3).** `@scope` holds a list of
+locations on both sides, so the field itself relates: the CSE codec decodes
+the list as JSCert's `lexical_env`. What the locations point to differs:
+Gillian's environment records are objects (marked by `@er`), JSCert's live in
+its separate environment heap. That heap is outside the memory-level
+simulation (D1), which relates the object heap only, so this is the boundary
+of the related fragment, as decided, rather than a mismatch within it.
 
 ## 6. Values
 
