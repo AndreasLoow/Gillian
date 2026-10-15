@@ -79,8 +79,9 @@ end
 module JSSubst : NameMap = struct
   let action_substitutions =
     [
-      ("GetCell", "left_load");
-      ("SetCell", "left_store");
+      ("GetCell", "left_lookup");
+      ("SetCell", "left_mutate");
+      ("DeleteCell", "left_delete");
       ("GetAllProps", "left_inner_get_domainset");
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
@@ -89,7 +90,7 @@ module JSSubst : NameMap = struct
 
   let pred_substitutions =
     [
-      ("Cell", "left_ex");
+      ("Cell", "left_dyn");
       ("Props", "left_inner_domainset");
       ("Metadata", "right_ag");
     ]
@@ -109,6 +110,7 @@ module JSFilter : FilterVals = struct
     [
       "GetCell";
       "SetCell";
+      "DeleteCell";
       "Alloc";
       "DeleteObject";
       "GetMetadata";
@@ -171,7 +173,7 @@ end
 
 (* Override pretty printing, implement `is_not_nono` *)
 module ObjectBase = struct
-  include PMap (StringIndex) (Exclusive)
+  include PMap (StringIndex) (DynCell)
 
   let pp ft ((h, d) : t) =
     let d =
@@ -182,7 +184,7 @@ module ObjectBase = struct
     let open Fmt in
     let pp_bindings =
       iter_bindings ~sep:comma ExpMap.iter
-        (hbox (parens (pair ~sep:(any " :") Expr.pp Exclusive.pp)))
+        (hbox (parens (pair ~sep:(any " :") Expr.pp DynCell.pp)))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
 
@@ -202,7 +204,7 @@ end
 
 (* Override pretty printing, implement `is_not_nono` *)
 module SplitObjectBase = struct
-  include SplitPMap (StringIndex) (Exclusive)
+  include SplitPMap (StringIndex) (DynCell)
 
   let pp ft (((ch, sh), d) : t) =
     let h = ExpMap.union (fun _ a _ -> Some a) ch sh in
@@ -214,7 +216,7 @@ module SplitObjectBase = struct
     let open Fmt in
     let pp_bindings =
       iter_bindings ~sep:comma ExpMap.iter
-        (hbox (parens (pair ~sep:(any " :") Expr.pp Exclusive.pp)))
+        (hbox (parens (pair ~sep:(any " :") Expr.pp DynCell.pp)))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
 

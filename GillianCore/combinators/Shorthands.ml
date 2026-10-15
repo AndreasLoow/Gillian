@@ -30,6 +30,7 @@ module StringIndex = PMap.StringIndex
 (* Leaves *)
 module Agreement = Agreement
 module Exclusive = Exclusive
+module DynCell = DynCell
 module Fractional = Fractional
 
 (* Transformers *)

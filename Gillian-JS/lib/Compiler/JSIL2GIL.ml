@@ -313,7 +313,7 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         resource_error [ Expr.PVar aux1; Expr.PVar aux2 ]
       in
       let cmd6 : string GCmd.t =
-        LAction (aux4, JSILNames.setCell, [ e1'; e2'; Expr.Lit Nono ])
+        LAction (aux4, JSILNames.delCell, [ e1'; e2' ])
       in
       [
         (lab, cmd1);

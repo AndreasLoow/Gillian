@@ -25,11 +25,11 @@ Status markers:
 |---|---|---|---|
 | Heap | `OpenPMap(LocationIndex)` | `map_mm Loc` | `Heap.heap object_loc object` |
 | Object | product with alloc-init (target) | `prod_mm` + `cmm_init` | `object` |
-| Properties | `PMap(StringIndex)` with domain set, over `DynCell` (target) | `js_map_mm DynCell` | `object_properties_` : `Heap.heap prop_name attributes` |
+| Properties | `PMap(StringIndex)` with domain set, over `DynCell` (now) | `js_map_mm DynCell` | `object_properties_` : `Heap.heap prop_name attributes` |
 | Slots | static-domain `PMap(SlotName)` over `Exclusive` (target) | `dom_map_mm SlotName ex_mm` | the other 23 fields of `object` |
 
 **Now:**
-- an object is `Product(PMap(StringIndex, Exclusive), Agreement)`;
+- an object is `Product(PMap(StringIndex, DynCell), Agreement)`;
 - the attributes and internal fields live in a separate metadata object, which
   the `Agreement` side points to;
 - `MoveInToOut` makes the domain an in of `Props`, as in the JSIL logic.
@@ -55,13 +55,23 @@ Status markers:
 
 | Predicate | Meaning | CSE resource |
 |---|---|---|
-| `Prop(l, p; attrs)` | the property `p` of `l`; `none` means owned and absent | `DynCell` cell |
+| `Prop(l, p; attrs)` (now `Cell`) | the property `p` of `l`; `none` means owned and absent | `DynCell` `rm_cell` |
 | `Props(l, D)` | every property of `l` outside `D` is owned and absent | `JS_Map` domain (`pointsto_undef_vs_dom`) |
 | `Slot(l, f; v)` | the slot `f` of `l` | `ex_mm` cell |
 
 - `Props` takes the domain as an in on both sides.
 - `DataProp`, `AccessorProp`, `JSObject`, `JSObjGeneral` and so on become
   logic-level predicates over these, keeping their names.
+
+**`DynCell`.** Gillian's `DynCell` (`GillianCore/combinators/DynCell.ml`) has
+the actions `lookup`, `mutate` and `delete` and the single predicate `dyn`,
+like CSE's `act_lookup`, `act_mutate`, `act_delete` and `rm_cell`.
+- An absent cell holds `none` on the Gillian side, and is `DC_absent` on the
+  CSE side, which reads back as `VUndef`.
+- Writing `none` is an error on the Gillian side; CSE's `mutate` errors on any
+  value outside the cell's type.
+- CSE also has the resources `rm_val` and `rm_absent`, one per state. `rm_cell`
+  is their union for cells that never hold `VUndef`.
 
 ## 4. Attributes
 
