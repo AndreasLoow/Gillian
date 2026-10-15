@@ -11,7 +11,9 @@ predicate changes on either side.
 
 The two memory models are built from combinators that correspond one to one,
 and they expose the same actions and core predicates. The simulation relates
-the CSE model to JSCert's object heap.
+the CSE model to JSCert's object heap (`js_theories/JsCert_Heap_Sim.v`): it
+holds in both directions, allocation excluded from the CSE-to-JSCert one, and
+it is lifted through CSE's whole-memory transfer theorems.
 
 ## 1. Combinator stack
 
@@ -84,7 +86,9 @@ In JSIL logic these are `((l, p) -> attrs)`, `empty_fields(l : D)`,
 
 ## 5. Slots
 
-See `Gillian-JS/lib/utils/JSCertInterface.ml` for the table. `@proto` and
+See `Gillian-JS/lib/utils/JSCertInterface.ml` for the table. On the CSE side,
+`js_theories/JS_Fields.v` gives each field a codec between its JSCert type and
+values; the slot table, defaults and types included, is derived from it. `@proto` and
 `@class` default to `null` and `"Object"`, as in `object_new null "Object"`;
 an option field defaults to `empty`.
 
@@ -124,7 +128,7 @@ there):
 | `prim_bool b` | `b` | `VBool b` |
 | `prim_string s` | `s` | `VString s` |
 | `prim_number n` | `n` | `VNum n`: the ADT value `JSNum (bits_of_b64 n)` |
-| an object location | a location | `VNat (object_loc_to_nat l)`: ordinary locations odd, built-in ones even |
+| an object location | a location | `VNat (object_loc_to_nat l)`: the 82 built-in locations first, then ordinary ones |
 | option `None` | `empty` | `VEmpty`: the ADT value `JSEmpty` |
 
 The ADT constructors are a parameter (`JS_ADTs`), since CSE's ADT environment
@@ -133,5 +137,23 @@ The ADT constructors are a parameter (`JS_ADTs`), since CSE's ADT environment
 ## 7. Open decisions
 
 - **D3: `code` and `scope`.** `code` relates a function id to a JSCert
-  `funcbody` through a fixed code table. `scope` stays outside the related
-  fragment while environment records remain objects.
+  `funcbody` through a fixed code table (`JS_Slots.Code_Table`). `scope` is a
+  list of environment locations on the CSE side, as in JSCert; the Gillian
+  runtime does not use JSCert's environment records yet.
+
+## 8. The JSCert heap as a memory model
+
+`js_theories/Wrapper_JsCert.v` gives each action of the CSE heap its JSCert
+meaning:
+
+| Action | JSCert |
+|---|---|
+| `alloc` | `object_alloc S (object_new null "Object")` |
+| property `lookup` | `Heap.read_option` of the object's properties, `undefined` if absent |
+| property `mutate` | `object_write` with `Heap.write` of the properties |
+| property `delete` | `object_write` with `Heap.rem` of the properties |
+| slot `lookup` | the field, encoded |
+| slot `mutate` | the field, decoded and written; a value of the wrong type errs |
+
+Any other input errs. The relation maps every location to the encoding of the
+object there: every property owned, every slot owned, and the domain.
