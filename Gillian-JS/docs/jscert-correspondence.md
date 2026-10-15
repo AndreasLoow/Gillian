@@ -56,7 +56,7 @@ it is lifted through CSE's whole-memory transfer theorems.
 | `GetCell(l, p) → attrs \| none` | heap → properties → `DynCell lookup` | `Heap.read_option (object_properties_ O) p` |
 | `SetCell(l, p, attrs)` | … → `DynCell mutate` | `object_set_property` |
 | `DeleteCell(l, p)` | … → `DynCell delete` | `object_rem_property` |
-| `GetAllProps(l) → [p…]` | properties domain | the domain of `object_properties_` (planned: a keys action on the CSE side) |
+| `GetAllProps(l) → [p…]` | properties domain; CSE: `keys_mm`'s `act_keys` (`js_theories/Keys.v`) | the names of the properties of `object_properties_`, once each, in any order |
 | `GetSlot(l, f) → v` | heap → slots → `Exclusive load` at `f` | the field `f` of the object at `l` |
 | `SetSlot(l, f, v)` | … → `Exclusive store` at `f` | `object_write` with field `f` updated |
 
@@ -111,11 +111,21 @@ there):
 - `@er`, which marks environment records (decision 2: they are still
   objects).
 
-**Still to align with JSCert (A7):**
-- `@call` and `@construct` hold a JSIL procedure id; JSCert holds a tag
-  (`call_default`, …), with a user function's code in `object_code_`.
-- The runtime does not set the method tags (`@get = "function"` for function
-  objects, `"args_obj"` for arguments objects, …).
+**Functions and method tags (A7).**
+- A user function has `@call` and `@construct` set to `"default"`
+  (`call_default`, `construct_default`), its body's procedure id in `@code`,
+  its parameters in `@formalParameters`, and `@get` and `@hasInstance` set to
+  `"function"`, as JSCert's 13.2 does. Calls resolve `"default"` to `@code`.
+- Arrays have `@defineOwnProperty` set to `"array"`.
+- Arguments objects keep the default methods: the code is strict, and
+  JSCert's `args_obj` variants are for non-strict arguments objects.
+
+**Still to align with JSCert:**
+- Built-in functions keep their implementing procedure in `@call` and
+  `@construct`; JSCert uses `call_prealloc`/`construct_prealloc`, which needs
+  Gillian's built-ins to be preallocated objects.
+- `@scope` holds a list of environment-record objects (decision 2).
+- The Gillian side does not type-check `SetSlot`.
 
 ## 6. Values
 
@@ -152,6 +162,7 @@ meaning:
 | property `lookup` | `Heap.read_option` of the object's properties, `undefined` if absent |
 | property `mutate` | `object_write` with `Heap.write` of the properties |
 | property `delete` | `object_write` with `Heap.rem` of the properties |
+| property `keys` | the names bound in the properties, once each, in any order |
 | slot `lookup` | the field, encoded |
 | slot `mutate` | the field, decoded and written; a value of the wrong type errs |
 
