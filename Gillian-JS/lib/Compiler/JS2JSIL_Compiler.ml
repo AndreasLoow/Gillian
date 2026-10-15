@@ -1374,7 +1374,19 @@ let rec translate_expr tr_ctx e :
             (cmds @ new_cmds, errs @ new_errs, num + 1))
           ([], [], 0) eos
       in
-      let cmds = annotate_first_cmd (cmd_cdo_call :: cmd_set_len 0 :: cmds) in
+      (* slot(x_cdo, "@defineOwnProperty") := "array" *)
+      let cmd_set_dop =
+        annotate_cmd
+          (LBasic
+             (SetSlot
+                ( PVar x_cdo,
+                  Lit (String "@defineOwnProperty"),
+                  Lit (String "array") )))
+          None
+      in
+      let cmds =
+        annotate_first_cmd (cmd_cdo_call :: cmd_set_dop :: cmd_set_len 0 :: cmds)
+      in
       (cmds, PVar x_cdo, errs)
   | JS_Parser.Syntax.Obj xs ->
       (*

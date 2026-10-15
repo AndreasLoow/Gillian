@@ -12,7 +12,8 @@ pred ArrayStructure(a:Obj, arrayLength:Num) :
   Slot(a, "@proto", $larr_proto) * (* Prototype is the array prototype    *)
   Slot(a, "@class", "Array") *     (* Class is "Array"                    *)
   Slot(a, "@extensible", true) *        (* Array buffers are extensible        *)
-  slots_domain(a : -{ "@class", "@extensible", "@proto" }-) *
+  Slot(a, "@defineOwnProperty", "array") *
+  slots_domain(a : -{ "@class", "@defineOwnProperty", "@extensible", "@proto" }-) *
 
   ((a, "length") -> {{ "d", arrayLength, true, false, false }});
 
@@ -22,7 +23,8 @@ pred FrozenArrayStructure(a:Obj, arrayLength:Num) :
   Slot(a, "@proto", $larr_proto) * (* Prototype is the array prototype    *)
   Slot(a, "@class", "Array") *     (* Class is "Array"                    *)
   Slot(a, "@extensible", false) *       (* Frozen arrays are not extensible    *)
-  slots_domain(a : -{ "@class", "@extensible", "@proto" }-) *
+  Slot(a, "@defineOwnProperty", "array") *
+  slots_domain(a : -{ "@class", "@defineOwnProperty", "@extensible", "@proto" }-) *
 
   ((a, "length") -> {{ "d", arrayLength, false, false, false }});
 

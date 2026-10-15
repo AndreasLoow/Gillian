@@ -501,6 +501,7 @@ proc a__defineOwnProperty (l, prop, desc, thrw) {
 proc Array_construct (xsc, vthis) {
             (* Default array construction *)
             array := "create_default_object" ($larr_proto, "Array", true);
+            slot(array, "@defineOwnProperty") := "array";
             [array, "length"] := {{ "d", 0, true, false, true }};
 
             (* All runtime arguments *)

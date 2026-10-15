@@ -230,6 +230,7 @@ proc setupInitialHeap () {
       (* Array.prototype *)
 
       ret := "create_default_object_concrete" ($larr_proto, $lobj_proto, "Array", true);
+      slot($larr_proto, "@defineOwnProperty") := "array";
 
       [$larr_proto, "length"]         := {{ "d", 0, true, false, false }};
       [$larr_proto, "constructor"]    := {{ "d", $larr, true, false, true }};
