@@ -152,7 +152,7 @@ there):
   JSCert lacks (ES6+ ones, `Date`, `Math` beyond `abs`, …) are outside the
   simulated fragment.
 
-**Environment records (decisions 2 and D3).** `@scope` holds a list of
+**Environment records (decision 2, D3 (a)).** `@scope` holds a list of
 locations on both sides, so the field itself relates: the CSE codec decodes
 the list as JSCert's `lexical_env`. What the locations point to differs:
 Gillian's environment records are objects (marked by `@er`), JSCert's live in
@@ -179,10 +179,11 @@ The ADT constructors are a parameter (`JS_ADTs`), since CSE's ADT environment
 
 ## 7. Open decisions
 
-- **D3: `code` and `scope`.** `code` relates a function id to a JSCert
-  `funcbody` through a fixed code table (`JS_Slots.Code_Table`). `scope` is a
-  list of environment locations on the CSE side, as in JSCert; the Gillian
-  runtime does not use JSCert's environment records yet.
+- **D3: `code` and `scope`** (decided). `code` relates a function id to a
+  JSCert `funcbody` through a fixed code table (`JS_Slots.Code_Table`).
+  `scope` takes option (a): it relates as a list of locations, and the
+  environment records it points to stay objects, outside the object-heap
+  simulation (decision 2).
 
 ## 8. The JSCert heap as a memory model
 
