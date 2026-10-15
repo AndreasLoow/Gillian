@@ -6,7 +6,7 @@ predicate changes on either side.
 - **Gillian-JS:** the OCaml memory model in `Gillian-JS/lib/Memory/`, built
   from `Gillian.Combinators`.
 - **CSE:** the Rocq memory model on `GillianPlatform/CSE`, branch `cse-tree`,
-  theory `js_theories/`.
+  theory `js_theories/`, whose `correspondence.md` mirrors this table.
 - **JSCert:** `AndreasLoow/jscert`, mainly `coq/JsSyntax.v` and `coq/JsCommon.v`.
 
 The two memory models are built from combinators that correspond one to one,
