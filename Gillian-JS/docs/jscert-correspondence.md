@@ -29,6 +29,11 @@ it is lifted through CSE's whole-memory transfer theorems.
 - Allocation gives an object with every property absent and every slot in its
   default state, which is JSCert's `object_new null "Object"`.
 
+On the CSE side every combinator in the stack is proven sound, concrete and
+symbolic side alike. The property map owns each property whole: its cells
+never compose (`JS_Map.Exclusive_Cells`, which `DynCell` satisfies), as on the
+Gillian side, where a `PMap` entry is a single `DynCell`.
+
 **`DynCell`** (`GillianCore/combinators/DynCell.ml`, `js_theories/DynCell.v`).
 - Actions `lookup`, `mutate`, `delete`; predicate `dyn`, CSE resource `rm_cell`.
 - An absent cell holds `none` on the Gillian side and is `DC_absent` on the CSE
