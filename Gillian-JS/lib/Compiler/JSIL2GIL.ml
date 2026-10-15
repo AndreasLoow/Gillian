@@ -415,13 +415,13 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       ]
   (*
        C(x := slot(e1, e2)) :-
-         lab: aux := [GetSlot](e1, e2);
+         lab: aux := [GetSlot](e1, e2, e2);
               x := l-nth(aux, 2)
     *)
   | LBasic (GetSlot (x, e1, e2)) ->
       let aux = fresh_var () in
       let cmd1 : string GCmd.t =
-        LAction (aux, JSCertInterface.get_slot, [ fe e1; fe e2 ])
+        LAction (aux, JSCertInterface.get_slot, [ fe e1; fe e2; fe e2 ])
       in
       let cmd2 : string GCmd.t =
         Assignment (x, BinOp (Expr.PVar aux, LstNth, Expr.int 2))
@@ -429,12 +429,14 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
       [ (lab, cmd1); (None, cmd2) ]
   (*
        C(slot(e1, e2) := e3) :-
-         lab: aux := [SetSlot](e1, e2, e3)
+         lab: aux := [SetSlot](e1, e2, e2, e3)
     *)
   | LBasic (SetSlot (e1, e2, e3)) ->
       let aux = fresh_var () in
       [
-        (lab, LAction (aux, JSCertInterface.set_slot, [ fe e1; fe e2; fe e3 ]));
+        ( lab,
+          LAction (aux, JSCertInterface.set_slot, [ fe e1; fe e2; fe e2; fe e3 ])
+        );
       ]
   (*
        C(x := MetaData(e)) :-

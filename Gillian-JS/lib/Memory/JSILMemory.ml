@@ -8,7 +8,7 @@ module JSCI = Javert_utils.JSCertInterface
 module StringIndex = struct
   include StringIndex
 
-  let default_instantiation _ = [ Expr.Lit Nono ]
+  let default_instantiation = [ Expr.Lit Nono ]
 end
 
 (* An object: its properties and its slots. Neither side takes arguments when
@@ -85,15 +85,15 @@ module JSSubst : NameMap = struct
       ("GetAllProps", "left_inner_get_domainset");
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
-      ("GetSlot", "right_load");
-      ("SetSlot", "right_store");
+      ("GetSlot", "right_lookup");
+      ("SetSlot", "right_mutate");
     ]
 
   let pred_substitutions =
     [
       ("Cell", "left_dyn");
       ("Props", "left_inner_domainset");
-      ("Slot", "right_ex");
+      ("Slot", "right_slot");
       ("SlotsDomain", "right_domainset");
     ]
 end
@@ -175,30 +175,50 @@ module SlotIndex : PMapIndex = struct
     | e -> Delayed.return (Some e)
 
   let make_fresh () = failwith "Invalid in dynamic mode"
-
-  (* A slot outside the domain holds its default *)
-  let default_instantiation = function
-    | Expr.Lit (String n) -> (
-        match JSCI.slot_default n with
-        | Some v -> [ Expr.Lit v ]
-        | None -> [])
-    | _ -> []
+  let default_instantiation = []
 end
 
-(* An object's slots. The domain set holds the slots described explicitly; every
-   other slot holds its default. Allocation gives every slot its default. *)
+(* An object's slots. A slot outside the domain set is in its default state;
+   allocation leaves every slot in it. A slot's cell takes the slot's name as
+   its first argument, so actions and predicates on a slot repeat its index. *)
 module Slots = struct
-  include MoveInToOut (PMap (SlotIndex) (Exclusive))
+  include MoveInToOut (PMap (SlotIndex) (SlotCell))
 
   let instantiate = function
     | [] -> ((fst (empty ()), Some (Expr.ESet [])), [])
     | _ -> failwith "Invalid Slots instantiation"
 
+  let slot_pred = Option.get (pred_from_str "slot")
+  let domainset_pred = Option.get (pred_from_str "domainset")
+
+  (* The cells cannot state their own assertions, which need their names *)
+  let assertions ((h, d) : t) =
+    ExpMap.fold
+      (fun k c acc ->
+        let v =
+          match c with
+          | Some (SlotCell.Val v) -> Some v
+          | Some SlotCell.Default -> SlotCell.default_of k
+          | None -> None
+        in
+        match v with
+        | Some v -> (slot_pred, [ k; k ], [ v ]) :: acc
+        | None -> acc)
+      h []
+    @ Option.fold ~none:[] ~some:(fun d -> [ (domainset_pred, [ d ], []) ]) d
+
+  let get_fixes e =
+    get_fixes e
+    |> Gillian.Combinators.Fix.map_corepred (fun (p, ins, outs) ->
+           match ins with
+           | k :: ins when p = slot_pred -> (p, k :: k :: ins, outs)
+           | _ -> (p, ins, outs))
+
   let pp ft ((h, d) : t) =
     let open Fmt in
     let pp_bindings =
       iter_bindings ~sep:comma ExpMap.iter
-        (hbox (pair ~sep:(any ": ") Expr.pp Exclusive.pp))
+        (hbox (pair ~sep:(any ": ") Expr.pp SlotCell.pp))
     in
     pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
 end

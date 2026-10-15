@@ -53,9 +53,9 @@ module type PMapImpl = sig
   *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state at the given index. Only
-      used in dynamic mode *)
-  val default_instantiation : Expr.t -> Expr.t list
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
+  val default_instantiation : Expr.t list
 
   (* Note for the below two functions we use option Delayed rather than
      result Delayed, to avoid the headache of handling additional errors. *)
@@ -201,7 +201,7 @@ struct
                       f "STATIC NotAllocated: %a" Expr.pp idx');
                   DR.error (NotAllocated idx')
               | Dynamic ->
-                  let ss, _ = S.instantiate (I.default_instantiation idx') in
+                  let ss, _ = S.instantiate I.default_instantiation in
                   let h' = I.set ~idx:idx' ~idx':idx ss h in
                   let* s' = domain_add idx' (h', Some d) in
                   DR.ok (s', idx', ss)))
@@ -587,9 +587,9 @@ module type PMapIndex = sig
   *)
   val make_fresh : unit -> Expr.t Delayed.t
 
-  (** The arguments used when instantiating new state at the given index. Only
-      used in dynamic mode *)
-  val default_instantiation : Expr.t -> Expr.t list
+  (** The arguments used when instantiating new state. Only used in dynamic mode
+  *)
+  val default_instantiation : Expr.t list
 end
 
 module LocationIndex : PMapIndex = struct
@@ -602,14 +602,14 @@ module LocationIndex : PMapIndex = struct
   let is_valid_index e =
     Delayed_option.map (MyUtils.get_loc e) Expr.loc_from_loc_name
 
-  let default_instantiation _ = []
+  let default_instantiation = []
 end
 
 module StringIndex : PMapIndex = struct
   let mode = Dynamic
   let is_valid_index = DO.some ~learned:[]
   let make_fresh () = failwith "Invalid in dynamic mode"
-  let default_instantiation _ = []
+  let default_instantiation = []
 end
 
 module IntegerIndex : PMapIndex = struct
@@ -634,7 +634,7 @@ module IntegerIndex : PMapIndex = struct
   let is_valid_index = function
     | l -> Delayed.return (Some l)
 
-  let default_instantiation _ = []
+  let default_instantiation = []
 end
 
 (** "Base" implementation of an open PMap, with no particular optimisation.
@@ -786,7 +786,7 @@ module ALocImpl (S : MyMonadicSMemory.S) = struct
 
   let mode : index_mode = Static
   let make_fresh () = ALoc.alloc () |> Expr.loc_from_loc_name |> Delayed.return
-  let default_instantiation _ = []
+  let default_instantiation = []
   let empty = SMap.empty
   let fold f = SMap.fold (fun k v acc -> f (Expr.loc_from_loc_name k) v acc)
   let for_all f = SMap.for_all (fun _ v -> f v)

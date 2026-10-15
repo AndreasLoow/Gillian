@@ -173,11 +173,11 @@ module M : Memory_S with type init_data = unit = struct
       | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSCertInterface.get_slot then
       match args with
-      | [ loc; slot ] -> get_slot heap loc slot
+      | [ loc; slot; _ ] -> get_slot heap loc slot
       | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSCertInterface.set_slot then
       match args with
-      | [ loc; slot; v ] -> set_slot heap loc slot v
+      | [ loc; slot; _; v ] -> set_slot heap loc slot v
       | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.getMetadata then
       match args with

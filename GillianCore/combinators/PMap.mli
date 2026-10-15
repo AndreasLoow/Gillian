@@ -11,7 +11,7 @@ module type PMapImpl = sig
   val find_opt_unsafe : t -> Expr.t -> Entry.t option
   val mode : index_mode
   val make_fresh : unit -> Expr.t Delayed.t
-  val default_instantiation : Expr.t -> Expr.t list
+  val default_instantiation : Expr.t list
   val validate_index : Expr.t -> Expr.t option Delayed.t
   val get : t -> Expr.t -> (Expr.t * Entry.t) option Delayed.t
   val set : idx:Expr.t -> idx':Expr.t -> Entry.t -> t -> t
@@ -50,7 +50,7 @@ module type PMapIndex = sig
   val mode : index_mode
   val is_valid_index : Expr.t -> Expr.t option Delayed.t
   val make_fresh : unit -> Expr.t Delayed.t
-  val default_instantiation : Expr.t -> Expr.t list
+  val default_instantiation : Expr.t list
 end
 
 module LocationIndex : PMapIndex
