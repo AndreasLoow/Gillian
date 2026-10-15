@@ -565,7 +565,7 @@ proc setupInitialHeap () {
 
       m := metadata(ret);
       [m, "@scope"] := empty;
-      [m, "@formalParameters"] := {{ }};
+      slot(ret, "@formalParameters") := {{ }};
       [m, "@call"] := "ThrowTypeError";
       [ret, "length"] := {{ "d", 0, false, false, false }};
 

@@ -11,6 +11,12 @@ let pp fmt (loc, obj, metadata) =
     (Fmt.hashtbl ~sep:Fmt.comma pp_kv)
     obj Values.pp metadata
 
+let pp_props fmt (obj : t) =
+  let pp_kv fmt (prop, prop_val) =
+    Fmt.pf fmt "%s: %a" prop Values.pp prop_val
+  in
+  Fmt.pf fmt "@[<h>[ %a ]@]" (Fmt.hashtbl ~sep:Fmt.comma pp_kv) obj
+
 let init () : t = Hashtbl.create Config.medium_tbl_size
 let get (obj : t) (prop : string) = Hashtbl.find_opt obj prop
 

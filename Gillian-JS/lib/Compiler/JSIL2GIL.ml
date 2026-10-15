@@ -81,6 +81,10 @@ let rec jsil2gil_asrt (a : Asrt.t) : GAsrt.t =
   | PointsTo (e1, e2, e3) ->
       [ Asrt_utils.points_to ~loc:(fe e1) ~field:(fe e2) ~value:(fe e3) ]
   | MetaData (e1, e2) -> [ Asrt_utils.metadata ~loc:(fe e1) ~metadata:(fe e2) ]
+  | Slot (e1, e2, e3) ->
+      [ Asrt_utils.slot ~loc:(fe e1) ~slot:(fe e2) ~value:(fe e3) ]
+  | SlotsDomain (e1, e2) ->
+      [ Asrt_utils.slots_domain ~loc:(fe e1) ~domain:(fe e2) ]
   | EmptyFields (e1, e2) ->
       [ Asrt_utils.empty_fields ~loc:(fe e1) ~domain:(fe e2) ]
   | Pred (pn, ins, outs) ->
@@ -408,6 +412,29 @@ let jsil2core (lab : string option) (cmd : LabCmd.t) :
         (None, cmd3);
         (Some then_lab, cmd4);
         (Some else_lab, cmd5);
+      ]
+  (*
+       C(x := slot(e1, e2)) :-
+         lab: aux := [GetSlot](e1, e2);
+              x := l-nth(aux, 2)
+    *)
+  | LBasic (GetSlot (x, e1, e2)) ->
+      let aux = fresh_var () in
+      let cmd1 : string GCmd.t =
+        LAction (aux, JSCertInterface.get_slot, [ fe e1; fe e2 ])
+      in
+      let cmd2 : string GCmd.t =
+        Assignment (x, BinOp (Expr.PVar aux, LstNth, Expr.int 2))
+      in
+      [ (lab, cmd1); (None, cmd2) ]
+  (*
+       C(slot(e1, e2) := e3) :-
+         lab: aux := [SetSlot](e1, e2, e3)
+    *)
+  | LBasic (SetSlot (e1, e2, e3)) ->
+      let aux = fresh_var () in
+      [
+        (lab, LAction (aux, JSCertInterface.set_slot, [ fe e1; fe e2; fe e3 ]));
       ]
   (*
        C(x := MetaData(e)) :-

@@ -22,6 +22,7 @@ type t =
   | Star of t * t
   | PointsTo of JSExpr.t * JSExpr.t * JSExpr.t
   | MetaData of JSExpr.t * JSExpr.t
+  | Slot of JSExpr.t * JSExpr.t * JSExpr.t
   | Emp
   | Pred of string * JSExpr.t list * JSExpr.t list
   | Types of (string * Type.t) list
@@ -31,6 +32,7 @@ type t =
   | Closure of (string * JSExpr.t) list * (string * JSExpr.t) list
   | SChain of string * JSExpr.t
   | EmptyFields of JSExpr.t * JSExpr.t
+  | SlotsDomain of JSExpr.t * JSExpr.t
 
 let star (asrts : t list) : t =
   List.fold_left
@@ -87,10 +89,12 @@ let rec js2jsil
   | Star (a1, a2) -> Asrt.Star (f a1, f a2)
   | PointsTo (le1, le2, le3) -> Asrt.PointsTo (fe le1, fe le2, fe le3)
   | MetaData (le1, le2) -> Asrt.MetaData (fe le1, fe le2)
+  | Slot (le1, le2, le3) -> Asrt.Slot (fe le1, fe le2, fe le3)
   | Emp -> Asrt.Emp
   | Types vts ->
       Asrt.Types (List.map (fun (v, t) -> (Expr.from_var_name v, t)) vts)
   | EmptyFields (e, domain) -> Asrt.EmptyFields (fe e, fe domain)
+  | SlotsDomain (e, domain) -> Asrt.SlotsDomain (fe e, fe domain)
   | Pred (name, ins, outs)
     when (name = "JSFunctionObject" || name = "JSFunctionObjectStrong")
          &&

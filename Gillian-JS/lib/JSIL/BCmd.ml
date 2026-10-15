@@ -12,6 +12,8 @@ type t =
   | HasField of string * Expr.t * Expr.t  (** Field check *)
   | GetFields of string * Expr.t  (** All fields of an object *)
   | MetaData of string * Expr.t  (** Object metadata *)
+  | GetSlot of string * Expr.t * Expr.t  (** Slot lookup *)
+  | SetSlot of Expr.t * Expr.t * Expr.t  (** Slot mutation *)
 
 let pp fmt bcmd =
   match bcmd with
@@ -31,3 +33,7 @@ let pp fmt bcmd =
       Fmt.pf fmt "%s := hasField(%a, %a)" x Expr.pp e1 Expr.pp e2
   | GetFields (x, e) -> Fmt.pf fmt "%s := getFields (%a)" x Expr.pp e
   | MetaData (x, e) -> Fmt.pf fmt "%s := metadata (%a)" x Expr.pp e
+  | GetSlot (x, e1, e2) ->
+      Fmt.pf fmt "%s := slot (%a, %a)" x Expr.pp e1 Expr.pp e2
+  | SetSlot (e1, e2, e3) ->
+      Fmt.pf fmt "slot (%a, %a) := %a" Expr.pp e1 Expr.pp e2 Expr.pp e3

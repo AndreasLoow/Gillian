@@ -83,6 +83,7 @@
       "hasField",     Javert_Parser.HASFIELD;
       "getFields",    Javert_Parser.GETFIELDS;
       "metadata",     Javert_Parser.METADATA;
+      "slot",         Javert_Parser.SLOT;
       "args",         Javert_Parser.ARGUMENTS;
       "goto",         Javert_Parser.GOTO;
       "with",         Javert_Parser.WITH;
@@ -102,7 +103,9 @@
       "types",        Javert_Parser.LTYPES;
       "forall",       Javert_Parser.LFORALL;
       "empty_fields", Javert_Parser.EMPTYFIELDS;
+      "slots_domain", Javert_Parser.SLOTSDOMAIN;
       "MetaData",     Javert_Parser.LMETADATA;
+      "Slot",         Javert_Parser.LSLOT;
 
       (* Logic predicates *)
       "abstract", Javert_Parser.ABSTRACT;

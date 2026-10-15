@@ -1,6 +1,10 @@
 (library
  (name js_memory)
  (public_name gillian-js.memory)
- (libraries gillian gillian.ppx_sat.runtime ppx_deriving_yojson.runtime)
+ (libraries
+  gillian
+  gillian.ppx_sat.runtime
+  ppx_deriving_yojson.runtime
+  gillian-js.javert_utils)
  (preprocess
   (pps gillian.ppx_sat ppx_deriving.std ppx_deriving_yojson)))

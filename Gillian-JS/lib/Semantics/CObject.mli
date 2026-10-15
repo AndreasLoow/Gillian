@@ -3,6 +3,7 @@ open Gillian.Concrete
 type t
 
 val pp : Format.formatter -> string * t * Values.t -> unit
+val pp_props : Format.formatter -> t -> unit
 val init : unit -> t
 val get : t -> string -> Values.t option
 val set : t -> string -> Values.t -> unit

@@ -139,6 +139,7 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token HASFIELD
 %token GETFIELDS
 %token METADATA
+%token SLOT
 %token ARGUMENTS
 %token GOTO
 %token WITH
@@ -167,11 +168,13 @@ let normalised_lvar_r = Str.regexp "##NORMALISED_LVAR"
 %token LARROW
 %token LEMP
 %token EMPTYFIELDS
+%token SLOTSDOMAIN
 %token ISINT
 (*%token LEXISTS *)
 %token LFORALL
 %token LTYPES
 %token LMETADATA
+%token LSLOT
 (* Logic predicates *)
 %token ABSTRACT
 %token PURE
@@ -495,6 +498,8 @@ assertion_target:
     { Asrt.PointsTo (obj_expr, prop_expr, val_expr) }
   | LMETADATA; LBRACE; eo = expr_target; COMMA; em = expr_target; RBRACE
     { Asrt.MetaData (eo, em) }
+  | LSLOT; LBRACE; eo = expr_target; COMMA; es = expr_target; COMMA; ev = expr_target; RBRACE
+    { Asrt.Slot (eo, es, ev) }
   | LEMP; { Asrt.Emp }
 (* Applications are written flat: the in/out split is a property of the
    definition and is derived from there. A `;` here is a syntax error. *)
@@ -506,6 +511,8 @@ assertion_target:
     { Asrt.Types type_pairs }
   | EMPTYFIELDS; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
     { Asrt.EmptyFields (le, domain) }
+  | SLOTSDOMAIN; LBRACE; le=expr_target; COLON; domain=expr_target; RBRACE
+    { Asrt.SlotsDomain (le, domain) }
   | LBRACE; ass=assertion_target; RBRACE
     { ass }
   | f = pure_assertion_target
@@ -631,6 +638,10 @@ cmd_target:
     { LabCmd.LBasic (GetFields (v, e)) }
   | v = VAR; DEFEQ; METADATA; LBRACE; e=expr_target; RBRACE
     { LabCmd.LBasic (MetaData (v, e)) }
+  | v = VAR; DEFEQ; SLOT; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE
+    { LabCmd.LBasic (GetSlot (v, e1, e2)) }
+  | SLOT; LBRACE; e1=expr_target; COMMA; e2=expr_target; RBRACE; DEFEQ; e3=expr_target
+    { LabCmd.LBasic (SetSlot (e1, e2, e3)) }
   | GOTO; i=VAR
     { LabCmd.LGoto i }
   | GOTO LBRACKET; e=expr_target; RBRACKET; i=VAR; j=VAR
@@ -1094,11 +1105,17 @@ js_assertion_target:
 (* empty_fields (le : le_domain) *)
   | EMPTYFIELDS; LBRACE; le=js_lexpr_target; COLON; domain=js_lexpr_target; RBRACE
     { JSAsrt.EmptyFields (le, domain) }
+(* slots_domain (le : le_domain) *)
+  | SLOTSDOMAIN; LBRACE; le=js_lexpr_target; COLON; domain=js_lexpr_target; RBRACE
+    { JSAsrt.SlotsDomain (le, domain) }
 (* Metadata (eo, em) *)
   | LMETADATA; LBRACE; eo = js_lexpr_target; COMMA; em = js_lexpr_target; RBRACE
     { (* validate_pred_assertion (name, params); *)
       JSAsrt.MetaData (eo, em)
     }
+(* Slot (eo, es, ev) *)
+  | LSLOT; LBRACE; eo = js_lexpr_target; COMMA; es = js_lexpr_target; COMMA; ev = js_lexpr_target; RBRACE
+    { JSAsrt.Slot (eo, es, ev) }
 (* (P) *)
   | delimited(LBRACE, js_assertion_target, RBRACE)
     { $1 }

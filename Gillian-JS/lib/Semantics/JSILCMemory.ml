@@ -31,7 +31,7 @@ module M : Memory_S with type init_data = unit = struct
     let obj = CHeap.get heap loc in
     match obj with
     | None -> raise (Failure "C Heap Update: object not found")
-    | Some (obj, _) ->
+    | Some (obj, _, _) ->
         (match v with
         | None -> CObject.remove obj prop
         | Some v when Values.to_literal v = Some Nono -> CObject.remove obj prop
@@ -52,7 +52,7 @@ module M : Memory_S with type init_data = unit = struct
     else
       match CHeap.get heap loc with
       | None -> Error ()
-      | Some (obj, _) ->
+      | Some (obj, _, _) ->
           let v = Option.value ~default:Literal.Nono (CObject.get obj prop) in
           Ok (heap, [ Loc loc; String prop; v ])
 
@@ -70,7 +70,7 @@ module M : Memory_S with type init_data = unit = struct
     else
       match CHeap.get heap loc with
       | None -> Error ()
-      | Some (obj, _) ->
+      | Some (obj, _, _) ->
           let props = CObject.properties obj in
           Ok
             ( heap,
@@ -92,7 +92,28 @@ module M : Memory_S with type init_data = unit = struct
     else
       match CHeap.get heap loc with
       | None -> Error ()
-      | Some (_, vm) -> Ok (heap, [ Loc loc; vm ])
+      | Some (_, vm, _) -> Ok (heap, [ Loc loc; vm ])
+
+  let get_slot (heap : t) (loc : vt) (slot : vt) : action_ret =
+    match (loc, slot) with
+    | Loc l, String n -> (
+        match CHeap.get heap l with
+        | None -> Error ()
+        | Some (_, _, slots) -> (
+            match CObject.get slots n with
+            | Some v -> Ok (heap, [ loc; slot; v ])
+            | None -> raise (Failure ("Concrete get_slot: no slot " ^ n))))
+    | _ -> raise (Failure "Illegal get_slot")
+
+  let set_slot (heap : t) (loc : vt) (slot : vt) (v : vt) : action_ret =
+    match (loc, slot) with
+    | Loc l, String n when JSCertInterface.is_slot_name n -> (
+        match CHeap.get heap l with
+        | None -> Error ()
+        | Some (_, _, slots) ->
+            CObject.set slots n v;
+            Ok (heap, []))
+    | _ -> raise (Failure "Illegal set_slot")
 
   let delete_object (heap : t) (loc : vt) : action_ret =
     let loc =
@@ -113,7 +134,12 @@ module M : Memory_S with type init_data = unit = struct
       | Some (Loc loc) -> loc
       | _ -> raise (Failure "C Allocation: non-loc loc argument")
     in
-    CHeap.set heap new_loc (CObject.init (), mv);
+    let slots = CObject.init () in
+    List.iter
+      (fun ({ name; default; _ } : JSCertInterface.slot) ->
+        CObject.set slots name default)
+      JSCertInterface.slots;
+    CHeap.set heap new_loc (CObject.init (), mv, slots);
     let new_loc_lit : Literal.t = Loc new_loc in
     Ok (heap, [ new_loc_lit ])
 
@@ -144,6 +170,14 @@ module M : Memory_S with type init_data = unit = struct
     else if action = JSILNames.getAllProps then
       match args with
       | [ loc ] -> get_domain heap loc
+      | _ -> raise (Failure "Internal Error. execute_action")
+    else if action = JSCertInterface.get_slot then
+      match args with
+      | [ loc; slot ] -> get_slot heap loc slot
+      | _ -> raise (Failure "Internal Error. execute_action")
+    else if action = JSCertInterface.set_slot then
+      match args with
+      | [ loc; slot; v ] -> set_slot heap loc slot v
       | _ -> raise (Failure "Internal Error. execute_action")
     else if action = JSILNames.getMetadata then
       match args with

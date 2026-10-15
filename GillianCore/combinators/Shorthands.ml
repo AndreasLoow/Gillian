@@ -12,7 +12,7 @@ module type PMapType = PMap.PMapType
 module type OpenPMapType = PMap.OpenPMapType
 
 type filter_mode = Filter.filter_mode
-type index_mode = PMap.index_mode
+type index_mode = PMap.index_mode = Static | Dynamic
 
 (* Helpers *)
 module DummyInject = Injector.DummyInject

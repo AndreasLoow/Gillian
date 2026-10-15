@@ -2,12 +2,13 @@ open Gillian.Monadic
 open Gillian.Combinators.Shorthands
 open Gil_syntax
 module ExpMap = Gillian.Combinators.MyUtils.ExpMap
+module JSCI = Javert_utils.JSCertInterface
 
 (* Default instantiation is Nono *)
 module StringIndex = struct
   include StringIndex
 
-  let default_instantiation = [ Expr.Lit Nono ]
+  let default_instantiation _ = [ Expr.Lit Nono ]
 end
 
 (* left side is a PMap that doesn't need any arguments, while
@@ -85,14 +86,18 @@ module JSSubst : NameMap = struct
       ("GetAllProps", "left_inner_get_domainset");
       ("Alloc", "alloc");
       ("DeleteObject", "delete");
-      ("GetMetadata", "right_load");
+      ("GetMetadata", "right_left_load");
+      ("GetSlot", "right_right_load");
+      ("SetSlot", "right_right_store");
     ]
 
   let pred_substitutions =
     [
       ("Cell", "left_dyn");
       ("Props", "left_inner_domainset");
-      ("Metadata", "right_ag");
+      ("Metadata", "right_left_ag");
+      ("Slot", "right_right_ex");
+      ("SlotsDomain", "right_right_domainset");
     ]
 end
 
@@ -115,9 +120,11 @@ module JSFilter : FilterVals = struct
       "DeleteObject";
       "GetMetadata";
       "GetAllProps";
+      "GetSlot";
+      "SetSlot";
     ]
 
-  let preds_filters = [ "Cell"; "Props"; "Metadata" ]
+  let preds_filters = [ "Cell"; "Props"; "Metadata"; "Slot"; "SlotsDomain" ]
 end
 
 (* Patch domainset to filter out all Nonos *)
@@ -161,14 +168,68 @@ end) =
     end)
     (S)
 
-(* The content of memory at a given location: object * metadata address *)
+(* Slot names are fixed: see JSCertInterface *)
+module SlotIndex : PMapIndex = struct
+  let mode : index_mode = Dynamic
+
+  let is_valid_index = function
+    | Expr.Lit (String n) as e when JSCI.is_slot_name n ->
+        Delayed.return (Some e)
+    | Expr.Lit _ -> Delayed.return None
+    | e -> Delayed.return (Some e)
+
+  let make_fresh () = failwith "Invalid in dynamic mode"
+
+  (* A slot outside the domain holds its default *)
+  let default_instantiation = function
+    | Expr.Lit (String n) -> (
+        match JSCI.slot_default n with
+        | Some v -> [ Expr.Lit v ]
+        | None -> [])
+    | _ -> []
+end
+
+(* An object's slots. The domain set holds the slots described explicitly; every
+   other slot holds its default. Allocation gives every slot its default. *)
+module Slots = struct
+  include MoveInToOut (PMap (SlotIndex) (Exclusive))
+
+  let instantiate = function
+    | [] -> ((fst (empty ()), Some (Expr.ESet [])), [])
+    | _ -> failwith "Invalid Slots instantiation"
+
+  let pp ft ((h, d) : t) =
+    let open Fmt in
+    let pp_bindings =
+      iter_bindings ~sep:comma ExpMap.iter
+        (hbox (pair ~sep:(any ": ") Expr.pp Exclusive.pp))
+    in
+    pf ft "[ @[%a@] | @[%a@] ]" pp_bindings h (option Expr.pp) d
+end
+
+(* The legacy metadata address and the slots. The metadata address goes once
+   the internal fields have moved into the slots. *)
+module MetadataAndSlots = struct
+  include Product (IDs) (Agreement) (Slots)
+
+  let instantiate v =
+    let s1, _ = Agreement.instantiate v in
+    let s2, _ = Slots.instantiate [] in
+    ((s1, s2), [])
+
+  let pp ft (s1, s2) = Fmt.pf ft "%a, slots %a" Agreement.pp s1 Slots.pp s2
+end
+
+(* The content of memory at a given location: object * (metadata address,
+   slots) *)
 module BaseMemoryContent (S : MyMonadicSMemory) = struct
   module S =
-    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S))) (Agreement)
+    PatchedProduct (IDs) (Mapper (JSSubstInner) (MoveInToOut (S)))
+      (MetadataAndSlots)
 
   include ActionAdder (DeleteActionAddition (S)) (S)
 
-  let get_metadata (_, s2) = s2
+  let get_metadata (_, (s2, _)) = s2
 end
 
 (* Override pretty printing, implement `is_not_nono` *)

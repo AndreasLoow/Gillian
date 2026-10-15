@@ -7,8 +7,11 @@ type t =
   | Star of t * t  (** Separating conjunction *)
   | PointsTo of Expr.t * Expr.t * Expr.t  (** Heap cell assertion *)
   | MetaData of Expr.t * Expr.t  (** MetaData *)
+  | Slot of Expr.t * Expr.t * Expr.t  (** Object slot *)
   | Pred of string * Expr.t list * Expr.t list  (** Predicates *)
   | EmptyFields of Expr.t * Expr.t  (** emptyFields assertion *)
+  | SlotsDomain of Expr.t * Expr.t
+      (** Every slot outside the domain holds its default *)
   | Pure of Expr.t  (** Pure formula *)
   | Types of (Expr.t * Type.t) list  (** Typing assertion *)
 
@@ -24,9 +27,15 @@ let compare x y =
   | MetaData _, MetaData _ -> cmp x y
   | MetaData _, _ -> -1
   | _, MetaData _ -> 1
+  | Slot _, Slot _ -> cmp x y
+  | Slot _, _ -> -1
+  | _, Slot _ -> 1
   | EmptyFields _, EmptyFields _ -> cmp x y
   | EmptyFields _, _ -> -1
   | _, EmptyFields _ -> 1
+  | SlotsDomain _, SlotsDomain _ -> cmp x y
+  | SlotsDomain _, _ -> -1
+  | _, SlotsDomain _ -> 1
   | Pure _, Pure _ -> cmp x y
   | Pure _, _ -> -1
   | _, Pure _ -> 1
@@ -64,8 +73,12 @@ let rec pp fmt (a : t) : unit =
       Fmt.pf fmt "types(@[%a@])" (Fmt.list ~sep:Fmt.comma pp_pair) type_list
   | EmptyFields (obj, domain) ->
       Fmt.pf fmt "empty_fields(%a : %a)" Expr.pp obj Expr.pp domain
+  | SlotsDomain (obj, domain) ->
+      Fmt.pf fmt "slots_domain(%a : %a)" Expr.pp obj Expr.pp domain
   (* MetaData (e1, e2) *)
   | MetaData (e1, e2) -> Fmt.pf fmt "MetaData (%a, %a)" Expr.pp e1 Expr.pp e2
+  | Slot (e1, e2, e3) ->
+      Fmt.pf fmt "Slot (%a, %a, %a)" Expr.pp e1 Expr.pp e2 Expr.pp e3
   (* Pure *)
   | Pure f -> Expr.pp fmt f
 
