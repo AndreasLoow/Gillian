@@ -232,6 +232,10 @@ pred DataPropConst (l:Obj, prop:Str; v, enum:Bool) :
   ((l, prop) -> {{ "d", v, false, enum, false }}) *
   (! (v == empty)) * (! (typeOf v == List));
 
+pred AccessorProp (l:Obj, prop:Str; get, set, enum:Bool, conf:Bool) :
+  ((l, prop) -> {{ "a", get, set, enum, conf }}) *
+  (! (get == empty)) * (! (set == empty));
+
 pred readOnlyProperty (l:Obj, prop:Str; v) :
   ((l, prop) -> {{ "d", v, false, true, false }}) *
   (! (v == empty));

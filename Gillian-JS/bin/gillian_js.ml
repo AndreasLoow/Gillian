@@ -11,8 +11,6 @@ module CLI =
       let runners : Gillian.Bulk.Runner.t list =
         [ (module Test262.Test262_runner); (module CosetteRunner) ]
     end)
-    (Gillian.Debugger.Lifter.Gil_lifter.Make
-       (SMemory)
-       (Js2jsil_lib.JS2GIL_ParserAndCompiler))
+    (Debugging.JSLifter.Make)
 
 let () = CLI.main ()

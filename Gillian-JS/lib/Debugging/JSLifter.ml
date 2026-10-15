@@ -1,354 +1,117 @@
+(* The debugger's view of the JavaScript memory: the generic GIL lifter, with
+   the heap shown as JavaScript objects. Objects are read off the memory's
+   core predicates rather than its internal state, so that the view does not
+   depend on how the memory is assembled. *)
+
 open Gil_syntax
-open Semantics
 open Debugger.Utils
 module PC = Js2jsil_lib.JS2GIL_ParserAndCompiler
+module SMemory = Js_memory.JSILMemory.Symbolic
+module JSCI = Javert_utils.JSCertInterface
+module JSILNames = Javert_utils.JSILNames
+
+type obj = {
+  mutable props : (Expr.t * Expr.t) list;
+  mutable props_domain : Expr.t option;
+  mutable slots : (Expr.t * Expr.t) list;
+  mutable slots_domain : Expr.t option;
+}
+
+let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
+
+(* The objects of the memory, by location, in order of appearance *)
+let objects_of memory : (Expr.t * obj) list =
+  let objs = ref [] in
+  let get loc =
+    match List.assoc_opt loc !objs with
+    | Some o -> o
+    | None ->
+        let o =
+          { props = []; props_domain = None; slots = []; slots_domain = None }
+        in
+        objs := (loc, o) :: !objs;
+        o
+  in
+  List.iter
+    (function
+      | Asrt.CorePred (p, [ l; k ], [ v ]) when p = JSILNames.aCell ->
+          let o = get l in
+          o.props <- (k, v) :: o.props
+      | Asrt.CorePred (p, [ l; d ], []) when p = JSILNames.aProps ->
+          (get l).props_domain <- Some d
+      | Asrt.CorePred (p, [ l; k ], [ v ]) when p = JSCI.a_slot ->
+          let o = get l in
+          o.slots <- (k, v) :: o.slots
+      | Asrt.CorePred (p, [ l; d ], []) when p = JSCI.a_slots_domain ->
+          (get l).slots_domain <- Some d
+      | _ -> ())
+    (SMemory.assertions memory);
+  List.rev !objs
+
+let sorted l = List.sort (fun (k, _) (k', _) -> Expr.compare k k') l
+
+(* The fields of an attribute record, named *)
+let attribute_fields (v : Expr.t) : (string * string) list option =
+  let named names es =
+    if List.length es = List.length names then
+      Some (List.combine names (List.map (to_str Expr.pp) es))
+    else None
+  in
+  let es =
+    match v with
+    | Expr.EList es -> Some es
+    | Expr.Lit (LList ls) -> Some (List.map Expr.lit ls)
+    | _ -> None
+  in
+  match es with
+  | Some (Expr.Lit (String "d") :: es) ->
+      named [ "value"; "writable"; "enumerable"; "configurable" ] es
+  | Some (Expr.Lit (String "a") :: es) ->
+      named [ "get"; "set"; "enumerable"; "configurable" ] es
+  | _ -> None
+
+let add_heap_variables memory (variables : Variable.ts) new_var_ref :
+    Variable.scope list =
+  let node name children =
+    let id = new_var_ref () in
+    Hashtbl.replace variables id children;
+    Variable.create_node name id ()
+  in
+  let domain name = function
+    | Some d -> [ Variable.create_leaf name (to_str Expr.pp d) () ]
+    | None -> []
+  in
+  let prop (k, v) =
+    let name = to_str Expr.pp k in
+    match v with
+    | Expr.Lit Nono -> Variable.create_leaf name "absent" ()
+    | _ -> (
+        match attribute_fields v with
+        | Some fields ->
+            node name
+              (List.map (fun (f, x) -> Variable.create_leaf f x ()) fields)
+        | None -> Variable.create_leaf name (to_str Expr.pp v) ())
+  in
+  let slot (k, v) =
+    Variable.create_leaf (to_str Expr.pp k) (to_str Expr.pp v) ()
+  in
+  let obj (loc, o) =
+    node (to_str Expr.pp loc)
+      ([
+         node "properties" (List.map prop (sorted o.props));
+         node "slots" (List.map slot (sorted o.slots));
+       ]
+      @ domain "property domain" o.props_domain
+      @ domain "slot domain" o.slots_domain)
+  in
+  let id = new_var_ref () in
+  Hashtbl.replace variables id (List.map obj (objects_of memory));
+  [ { id; name = "Objects" } ]
 
 module Make
     (Verification : Gillian.Abstraction.Verifier.S with type annot = PC.Annot.t) =
 struct
-  module Gil_lifter =
-    Gillian.Debugger.Lifter.Gil_lifter.Make (Semantics.Symbolic) (PC)
-      (Verification)
+  include Gillian.Debugger.Lifter.Gil_lifter.Make (SMemory) (PC) (Verification)
 
-  include Gil_lifter
-
-  let to_str pp = Fmt.to_to_string (Fmt.hbox pp)
-
-  (* TODO: All of this node stuff should be refactored to hide the scope id *)
-  let create_node_var name nodes get_new_scope_id (variables : Variable.ts) =
-    let id = get_new_scope_id () in
-    let () = Hashtbl.replace variables id nodes in
-    (id, Variable.create_node name id ())
-
-  let get_store_vars store =
-    store
-    |> List.map (fun (var, value) : Variable.t ->
-           let value = Fmt.to_to_string (Fmt.hbox Expr.pp) value in
-           Variable.create_leaf var value ())
-    |> List.sort (fun (v : Variable.t) (w : Variable.t) ->
-           Stdlib.compare v.name w.name)
-
-  let add_properties_vars properties get_new_scope_id (variables : Variable.ts)
-      =
-    let add_lst_vars
-        name
-        to_string
-        lst
-        get_new_scope_id
-        (variables : Variable.ts) =
-      let list_nodes =
-        List.mapi
-          (fun index element ->
-            Variable.create_leaf (string_of_int index) (to_string element) ())
-          lst
-      in
-      let _, node =
-        create_node_var name list_nodes get_new_scope_id variables
-      in
-      node
-    in
-    let property_nodes =
-      properties |> Expr.Map.to_seq
-      |> Seq.map (fun (name, value) ->
-             let name = to_str Expr.pp name in
-             match value with
-             | Expr.EList lst ->
-                 add_lst_vars name (to_str Expr.pp) lst get_new_scope_id
-                   variables
-             | Expr.Lit (Literal.LList lst) ->
-                 add_lst_vars name (to_str Literal.pp) lst get_new_scope_id
-                   variables
-             | _ -> Variable.create_leaf name (to_str Expr.pp value) ())
-      |> List.of_seq
-    in
-    let _, node =
-      create_node_var "properties" property_nodes get_new_scope_id variables
-    in
-    node
-
-  let add_memory_vars smemory get_new_scope_id (variables : Variable.ts) =
-    let sorted_locs_with_vals =
-      Semantics.Symbolic.sorted_locs_with_vals smemory
-    in
-    let value_nodes (loc, ((properties, domain), metadata)) : Variable.t =
-      let () = ignore properties in
-      let properties =
-        add_properties_vars properties get_new_scope_id variables
-      in
-      let domain =
-        Variable.create_leaf "domain" (to_str (Fmt.option Expr.pp) domain) ()
-      in
-      let metadata =
-        Variable.create_leaf "metadata"
-          (to_str (Fmt.option ~none:(Fmt.any "unknown") Expr.pp) metadata)
-          ()
-      in
-      let loc_id = get_new_scope_id () in
-      let () =
-        Hashtbl.replace variables loc_id [ properties; domain; metadata ]
-      in
-      Variable.create_node loc loc_id ()
-    in
-    List.map value_nodes sorted_locs_with_vals
-
-  let rec add_loc_vars
-      (loc : string)
-      smemory
-      get_new_scope_id
-      (variables : Variable.ts)
-      (loc_to_scope_id : (string, int) Hashtbl.t) : unit =
-    let rec add_lit_vars name lit : Variable.t =
-      match lit with
-      | Literal.Loc loc ->
-          let () =
-            add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
-          in
-          let id = Hashtbl.find loc_to_scope_id loc in
-          Variable.create_node name id ()
-      | LList lst ->
-          let nodes =
-            List.mapi
-              (fun index element ->
-                let name = string_of_int index in
-                add_lit_vars name element)
-              lst
-          in
-          let _, node = create_node_var name nodes get_new_scope_id variables in
-          node
-      | _ -> Variable.create_leaf name (to_str Literal.pp lit) ()
-    in
-    let add_expr_vars name expr =
-      match expr with
-      | Expr.ALoc loc ->
-          let () =
-            add_loc_vars loc smemory get_new_scope_id variables loc_to_scope_id
-          in
-          let id = Hashtbl.find loc_to_scope_id loc in
-          Variable.create_node name id ()
-      (* TODO: The below causes a stack overflow error in large pieces of
-         code, so they is probably a more efficient way to write this algorithm
-         or something else is just incorrect*)
-      (* | Expr.EList lst ->
-             let nodes =
-               List.mapi
-                 (fun index element ->
-                   let name = string_of_int index in
-                   add_expr_vars name element)
-                 lst
-             in
-             let _, node = create_node_var name nodes get_new_scope_id variables in
-             node
-         | Expr.Lit lit   -> add_lit_vars name lit *)
-      | _ -> Variable.create_leaf name (to_str Expr.pp expr) ()
-    in
-    let add_properties_vars properties =
-      let property_nodes =
-        properties |> Expr.Map.to_seq
-        |> Seq.map (fun (name, value) ->
-               let name = to_str Expr.pp name in
-               let field_names =
-                 [
-                   "descriptor_type";
-                   "value";
-                   "enumerable";
-                   "writable";
-                   "configurable";
-                 ]
-               in
-               match value with
-               | Expr.EList lst ->
-                   let nodes =
-                     if List.length lst == 5 then
-                       (* TODO: Not sure if this is always the case *)
-                       List.map2
-                         (fun name element -> add_expr_vars name element)
-                         field_names lst
-                     else
-                       List.mapi
-                         (fun index element ->
-                           let name = string_of_int index in
-                           add_expr_vars name element)
-                         lst
-                   in
-                   let _, node =
-                     create_node_var name nodes get_new_scope_id variables
-                   in
-                   node
-               | Expr.Lit (Literal.LList lst) ->
-                   let nodes =
-                     if List.length lst == 5 then
-                       List.map2
-                         (fun name element -> add_lit_vars name element)
-                         field_names lst
-                     else
-                       List.mapi
-                         (fun index element ->
-                           let name = string_of_int index in
-                           add_lit_vars name element)
-                         lst
-                   in
-
-                   let _, node =
-                     create_node_var name nodes get_new_scope_id variables
-                   in
-                   node
-               | _ -> add_expr_vars name value)
-        |> List.of_seq
-      in
-      let _, node =
-        create_node_var "properties" property_nodes get_new_scope_id variables
-      in
-      node
-    in
-    match Hashtbl.find_opt loc_to_scope_id loc with
-    | None ->
-        let loc_id = get_new_scope_id () in
-        let vars =
-          match SHeap.get smemory loc with
-          | None -> []
-          | Some ((properties, domain), metadata_opt) ->
-              let metadata_node metadata_opt : Variable.t =
-                let name = "metadata" in
-                match metadata_opt with
-                | None -> Variable.create_leaf name "unknown" ()
-                | Some metadata -> (
-                    match metadata with
-                    | Expr.ALoc child_loc ->
-                        let () =
-                          add_loc_vars child_loc smemory get_new_scope_id
-                            variables loc_to_scope_id
-                        in
-                        let id = Hashtbl.find loc_to_scope_id child_loc in
-                        Variable.create_node name id ()
-                    | _ ->
-                        Variable.create_leaf name (to_str Expr.pp metadata) ())
-              in
-              let properties = add_properties_vars properties in
-              (* let properties =
-                   add_properties_vars properties get_new_scope_id variables
-                 in *)
-              let domain =
-                Variable.create_leaf "domain"
-                  (to_str (Fmt.option Expr.pp) domain)
-                  ()
-              in
-              [ properties; domain; metadata_node metadata_opt ]
-        in
-
-        let () = Hashtbl.replace variables loc_id vars in
-        Hashtbl.replace loc_to_scope_id loc loc_id
-    | Some _ -> ()
-
-  let add_variables
-      ~store
-      ~memory
-      ~is_gil_file
-      ~get_new_scope_id
-      (variables : Variable.ts) =
-    if is_gil_file then
-      let store_id = get_new_scope_id () in
-      let memory_id = get_new_scope_id () in
-      let scopes : Variable.scope list =
-        [
-          { id = store_id; name = "Store" }; { id = memory_id; name = "Memory" };
-        ]
-      in
-      let store_vars = get_store_vars store in
-      let memory_vars = add_memory_vars memory get_new_scope_id variables in
-      let vars = [ store_vars; memory_vars ] in
-      let () =
-        List.iter2
-          (fun (scope : Variable.scope) vars ->
-            Hashtbl.replace variables scope.id vars)
-          scopes vars
-      in
-      scopes
-    else
-      let sorted_locs_with_vals =
-        Semantics.Symbolic.sorted_locs_with_vals memory
-      in
-      let loc_to_scope_id = Hashtbl.create 0 in
-      let () =
-        List.iter
-          (fun (loc, _) ->
-            add_loc_vars loc memory get_new_scope_id variables loc_to_scope_id)
-          sorted_locs_with_vals
-      in
-      (* TODO: probably better if we got a hash map of the store *)
-      let local_scope =
-        List.filter_map
-          (fun (var, value) ->
-            if var = Js2jsil_lib.JS2JSIL_Helpers.var_sc_first then
-              Some (var, value)
-            else None)
-          store
-      in
-      let local_scope_loc =
-        if List.length local_scope == 0 then ""
-        else
-          match List.hd local_scope with
-          | _, Expr.EList [ _; ALoc loc ] -> loc
-          | _ -> ""
-      in
-      let local_id : int =
-        match Hashtbl.find_opt loc_to_scope_id local_scope_loc with
-        | None ->
-            let local_id = get_new_scope_id () in
-            let () = Hashtbl.replace variables local_id [] in
-            local_id
-        | Some local_id -> local_id
-      in
-      let global_id : int =
-        match Hashtbl.find_opt loc_to_scope_id "$lg" with
-        | None ->
-            let global_id = get_new_scope_id () in
-            let () = Hashtbl.replace variables global_id [] in
-            global_id
-        | Some global_id -> global_id
-      in
-      let scopes : Variable.scope list =
-        [
-          { id = local_id; name = "Local Scope" };
-          { id = global_id; name = "Global Scope" };
-        ]
-      in
-      scopes
-
-  let top_level_scopes : Variable.scope list =
-    [
-      { id = 1; name = "Pure Formulae" };
-      { id = 2; name = "Typing Environment" };
-      { id = 3; name = "Predicates" };
-    ]
-
-  let get_variables _ { store; memory; pfs; types; preds; _ } _ =
-    let open Gil_lifter in
-    let open Variable in
-    let variables = Hashtbl.create 0 in
-    (* New scope ids must be higher than last top level scope id to prevent
-        duplicate scope ids *)
-    let scope_id = ref (List.length top_level_scopes) in
-    let get_new_scope_id () =
-      let () = scope_id := !scope_id + 1 in
-      !scope_id
-    in
-    let lifted_scopes =
-      let lifted_scopes =
-        add_variables ~store ~memory ~is_gil_file:false ~get_new_scope_id
-          variables
-      in
-      let pure_formulae_vars =
-        Option.fold ~some:get_pure_formulae_vars ~none:[] pfs
-      in
-      let type_env_vars = Option.fold ~some:get_type_env_vars ~none:[] types in
-      let pred_vars = Option.fold ~some:get_pred_vars ~none:[] preds in
-      let vars_list = [ pure_formulae_vars; type_env_vars; pred_vars ] in
-      let () =
-        List.iter2
-          (fun (scope : scope) vars -> Hashtbl.replace variables scope.id vars)
-          top_level_scopes vars_list
-      in
-      lifted_scopes
-    in
-    (lifted_scopes, variables)
+  let get_variables = get_variables' ~add_heap_variables
 end
